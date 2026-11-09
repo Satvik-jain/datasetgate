@@ -1,0 +1,140 @@
+{
+  ".codex/hooks.json": {
+    "mtime": 1794255986.0081646,
+    "seen": 1794256545.3869045,
+    "ast_hash": "16c780be2de1fd6f8b914a27f11f2719",
+    "semantic_hash": ""
+  },
+  ".gemini/settings.json": {
+    "mtime": 1794256104.3356826,
+    "seen": 1794256545.3869045,
+    "ast_hash": "f4ce7ea314154d8fad380d2ce3046c1c",
+    "semantic_hash": ""
+  },
+  "pyproject.toml": {
+    "mtime": 1794256283.5753548,
+    "seen": 1794256545.3869045,
+    "ast_hash": "d2fb3a318b1e33bfe0f26d1b0d61a34d",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/__init__.py": {
+    "mtime": 1794256309.9884253,
+    "seen": 1794256545.3869045,
+    "ast_hash": "7b371ef15b26e0bcf4bbac73f196194f",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/cli/__init__.py": {
+    "mtime": 1794256330.4500706,
+    "seen": 1794256545.3869045,
+    "ast_hash": "0835856717071ae032003eaa8404f695",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/cli/main.py": {
+    "mtime": 1794256490.060081,
+    "seen": 1794256545.3869045,
+    "ast_hash": "4bddc392b3c74bd85415f4b7ff64d7f0",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/comparison/__init__.py": {
+    "mtime": 1794256447.6077726,
+    "seen": 1794256545.3869045,
+    "ast_hash": "7fddbb5af54b7141a485f77d9ff5f1b4",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/comparison/engine.py": {
+    "mtime": 1794256450.8640964,
+    "seen": 1794256545.3869045,
+    "ast_hash": "50be84a16bb9b075da1231a0c722bc14",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/core/__init__.py": {
+    "mtime": 1794256392.8888607,
+    "seen": 1794256545.3869045,
+    "ast_hash": "6b4f86d4fcd7353fdfa3b5f209ec65df",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/core/config.py": {
+    "mtime": 1794256508.5555356,
+    "seen": 1794256545.3869045,
+    "ast_hash": "70710c84fcf14b99bbab9931f3491594",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/core/constants.py": {
+    "mtime": 1794256412.5453115,
+    "seen": 1794256545.3869045,
+    "ast_hash": "e139d0fb3df4e1cecd987e12911fd2c3",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/core/engine.py": {
+    "mtime": 1794256445.0420377,
+    "seen": 1794256545.3869045,
+    "ast_hash": "9eff34657a0bed9882f7d0dde14807eb",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/core/models.py": {
+    "mtime": 1794256493.82677,
+    "seen": 1794256545.3869045,
+    "ast_hash": "1f7ca8e1839a40adea0ec67b096e9013",
+    "semantic_hash": ""
+  },
+  "tests/test_cli.py": {
+    "mtime": 1794256490.0630813,
+    "seen": 1794256545.3869045,
+    "ast_hash": "7c9982ac64737842d9a9fceb424b53eb",
+    "semantic_hash": ""
+  },
+  "tests/test_config.py": {
+    "mtime": 1794256490.0832224,
+    "seen": 1794256545.3869045,
+    "ast_hash": "d11d2e2104d93f99d21f29c2bd5b3486",
+    "semantic_hash": ""
+  },
+  "tests/test_models.py": {
+    "mtime": 1794256471.2026124,
+    "seen": 1794256545.3869045,
+    "ast_hash": "c24cfa811e170e8127cca4824e107b8f",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1794255986.0016663,
+    "seen": 1794256545.3869045,
+    "ast_hash": "f36539ecc9af68f33ebd72770ce4a19e",
+    "semantic_hash": ""
+  },
+  "GEMINI.md": {
+    "mtime": 1794256104.334303,
+    "seen": 1794256545.3869045,
+    "ast_hash": "67d88e9d0760c3ba54c75dfd9551c1c5",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1794256324.636659,
+    "seen": 1794256545.3869045,
+    "ast_hash": "5afb5b5ad6f76f1da85fad5610927a7e",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/parsers/__init__.py": {
+    "mtime": 1794256559.7517838,
+    "seen": 1794256629.7558923,
+    "ast_hash": "9fe69e5b7d6e2a25fa6014ccc5e8efa3",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/parsers/base.py": {
+    "mtime": 1794256563.632736,
+    "seen": 1794256629.7558923,
+    "ast_hash": "b6cb72e02767a74ed28c24118ce66a7d",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/parsers/yolo.py": {
+    "mtime": 1794256619.2342901,
+    "seen": 1794256629.7558923,
+    "ast_hash": "d861c52d7a580975a76994267581c8ca",
+    "semantic_hash": ""
+  },
+  "tests/test_yolo_parser.py": {
+    "mtime": 1794256619.233289,
+    "seen": 1794256629.7558923,
+    "ast_hash": "4ff4dd1ef1d72e24db3ca011d09f956f",
+    "semantic_hash": ""
+  }
+}

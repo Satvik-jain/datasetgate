@@ -1,0 +1,15 @@
+{
+  "0": "core/__init__.py",
+  "1": "YoloParser",
+  "2": "audit",
+  "3": "config.py",
+  "4": "load_config",
+  "5": "test_cli.py",
+  "6": "DatasetManifest",
+  "7": "AGENTS.md",
+  "8": "GEMINI.md",
+  "9": "README.md",
+  "10": "cli/__init__.py",
+  "11": "comparison/__init__.py",
+  "12": "datasetgate"
+}
