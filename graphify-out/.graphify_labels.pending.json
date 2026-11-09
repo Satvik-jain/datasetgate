@@ -4,14 +4,18 @@
   "2": "core/engine.py",
   "3": "models.py",
   "4": "load_config",
-  "5": "Finding",
+  "5": "models.py",
   "6": "main.py",
   "7": "AGENTS.md",
   "8": "GEMINI.md",
-  "9": "README.md",
+  "9": "DatasetGate",
   "10": "cli/__init__.py",
   "11": "comparison/__init__.py",
   "12": "datasetgate",
   "13": "DatasetGateConfig",
-  "14": "test_cli.py"
+  "14": "test_comparison.py",
+  "15": "steps",
+  "16": "policy",
+  "17": "generator.py",
+  "18": "DatasetGate Rules & Defect Catalog"
 }

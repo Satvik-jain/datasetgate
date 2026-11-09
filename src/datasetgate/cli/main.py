@@ -235,6 +235,71 @@ def compare(
         raise typer.Exit(code=ExitCode.RUNTIME_ERROR) from e
 
 
+@app.command()
+def demo(
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--output-dir",
+            "-o",
+            help="Directory where synthetic demo dataset will be created",
+        ),
+    ] = Path("demo_dataset"),
+    format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Demo dataset format: 'yolo' or 'coco'",
+        ),
+    ] = "yolo",
+    audit: Annotated[
+        bool,
+        typer.Option(
+            "--audit/--no-audit",
+            help="Automatically run audit on the generated demo dataset",
+        ),
+    ] = True,
+) -> None:
+    """Generate a self-contained demo dataset with valid samples and deliberate defects."""
+    from datasetgate.synthetic.generator import (
+        generate_synthetic_coco_dataset,
+        generate_synthetic_yolo_dataset,
+    )
+
+    fmt = format.lower()
+    if fmt == "yolo":
+        ds_dir = generate_synthetic_yolo_dataset(output_dir)
+        console.print(
+            f"[bold green]Created synthetic YOLO demo dataset at:[/bold green] [cyan]{ds_dir.resolve()}[/cyan]"
+        )
+    elif fmt == "coco":
+        ds_dir = generate_synthetic_coco_dataset(output_dir)
+        console.print(
+            f"[bold green]Created synthetic COCO demo dataset at:[/bold green] [cyan]{ds_dir.resolve()}[/cyan]"
+        )
+    else:
+        err_console.print(
+            f"[bold red]Unsupported format:[/bold red] '{format}'. Must be 'yolo' or 'coco'."
+        )
+        raise typer.Exit(code=ExitCode.INVALID_USAGE)
+
+    if audit:
+        console.print("\n[bold cyan]Running demonstration audit...[/bold cyan]\n")
+        from datasetgate.core.config import DatasetGateConfig
+        from datasetgate.core.engine import run_audit
+
+        cfg = DatasetGateConfig()
+        out_reports = output_dir / "reports"
+        exit_code = run_audit(
+            dataset_path=ds_dir,
+            config=cfg,
+            output_dir=out_reports,
+            quiet=False,
+        )
+        raise typer.Exit(code=exit_code)
+
+
 def main() -> None:
     """Entry point for script console."""
     app()

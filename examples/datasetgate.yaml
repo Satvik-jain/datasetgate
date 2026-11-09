@@ -1,0 +1,50 @@
+# Example DatasetGate Configuration
+# https://github.com/Satvik-jain/datasetgate
+version: 1
+
+dataset:
+  # Ingestion format: 'auto', 'yolo', or 'coco'
+  format: auto
+
+  # Allowed image file extensions
+  image_extensions:
+    - .jpg
+    - .jpeg
+    - .png
+    - .bmp
+    - .webp
+    - .tif
+    - .tiff
+
+policy:
+  # Class coverage requirements
+  require_all_classes_in_train: true
+  require_all_classes_in_val: false
+
+  # Label rate and distribution thresholds
+  allow_unlabeled_images: true
+  max_empty_label_rate: 0.20
+  max_class_imbalance_ratio: 25.0
+
+  # Duplicates and cross-split leakage: 'ignore', 'warn', 'fail'
+  duplicate_policy: warn
+  split_leakage_policy: fail
+
+  # Physical image integrity policies
+  corrupted_image_policy: fail
+  missing_image_policy: fail
+  out_of_bounds_policy: fail
+
+  # Quality gate failure condition (error, warning)
+  fail_on:
+    - error
+
+  # Optional rule severity overrides:
+  # rule_severities:
+  #   BBOX_OUT_OF_BOUNDS: warning
+  #   UNSUPPORTED_IMAGE_FORMAT: error
+
+reporting:
+  output_dir: reports
+  generate_html: true
+  generate_json: true

@@ -30,9 +30,9 @@
     "semantic_hash": ""
   },
   "src/datasetgate/cli/main.py": {
-    "mtime": 1794256490.060081,
-    "seen": 1794256545.3869045,
-    "ast_hash": "4bddc392b3c74bd85415f4b7ff64d7f0",
+    "mtime": 1794257256.9740553,
+    "seen": 1794257283.1199107,
+    "ast_hash": "e6c5ef0f3fb82d41ae5a6f1ccf14bc41",
     "semantic_hash": ""
   },
   "src/datasetgate/comparison/__init__.py": {
@@ -108,9 +108,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1794256324.636659,
-    "seen": 1794256545.3869045,
-    "ast_hash": "5afb5b5ad6f76f1da85fad5610927a7e",
+    "mtime": 1794257230.889078,
+    "seen": 1794257283.1199107,
+    "ast_hash": "45f9ebde6970e27c9b4dc49e0cf3ff46",
     "semantic_hash": ""
   },
   "src/datasetgate/parsers/__init__.py": {
@@ -237,6 +237,60 @@
     "mtime": 1794257097.278258,
     "seen": 1794257104.1866877,
     "ast_hash": "2abf6a413135adae2d77025cfb4ffa6f",
+    "semantic_hash": ""
+  },
+  "examples/datasetgate.yaml": {
+    "mtime": 1794257155.7488093,
+    "seen": 1794257283.1199107,
+    "ast_hash": "88ede99b38d492bf10bc41480b18dfe7",
+    "semantic_hash": ""
+  },
+  "examples/github-actions/datasetgate.yml": {
+    "mtime": 1794257151.0027022,
+    "seen": 1794257283.1199107,
+    "ast_hash": "cc8dfbbba7d4c8ea33aeca7a86fdd942",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/synthetic/__init__.py": {
+    "mtime": 1794257136.1103995,
+    "seen": 1794257283.1199107,
+    "ast_hash": "d35857a7b80cb603032761c76ee79fb4",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/synthetic/generator.py": {
+    "mtime": 1794257256.9740553,
+    "seen": 1794257283.1199107,
+    "ast_hash": "2a081e836874dfafea7a614f80032c17",
+    "semantic_hash": ""
+  },
+  "tests/test_demo.py": {
+    "mtime": 1794257256.9292438,
+    "seen": 1794257283.1199107,
+    "ast_hash": "b85978a3ce0552b07f422e9b86418ea9",
+    "semantic_hash": ""
+  },
+  "docs/ARCHITECTURE.md": {
+    "mtime": 1794257169.4023614,
+    "seen": 1794257283.1199107,
+    "ast_hash": "101b646853b8e1de1abe95aafc165083",
+    "semantic_hash": ""
+  },
+  "docs/CONFIGURATION.md": {
+    "mtime": 1794257182.4881728,
+    "seen": 1794257283.1199107,
+    "ast_hash": "1a68fab21bd949643ba34032244d621b",
+    "semantic_hash": ""
+  },
+  "docs/ROADMAP.md": {
+    "mtime": 1794257203.7121503,
+    "seen": 1794257283.1199107,
+    "ast_hash": "478e5346743893cab034032d74dc0fb7",
+    "semantic_hash": ""
+  },
+  "docs/RULES.md": {
+    "mtime": 1794257195.1840823,
+    "seen": 1794257283.1199107,
+    "ast_hash": "a0eec2443645504375e173ceae552372",
     "semantic_hash": ""
   }
 }
