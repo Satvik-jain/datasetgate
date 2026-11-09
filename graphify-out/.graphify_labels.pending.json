@@ -1,8 +1,8 @@
 {
-  "0": "core/__init__.py",
+  "0": "models.py",
   "1": "YoloParser",
   "2": "audit",
-  "3": "config.py",
+  "3": "PolicyConfig",
   "4": "load_config",
   "5": "test_cli.py",
   "6": "DatasetManifest",
@@ -11,5 +11,6 @@
   "9": "README.md",
   "10": "cli/__init__.py",
   "11": "comparison/__init__.py",
-  "12": "datasetgate"
+  "12": "datasetgate",
+  "13": "DatasetGateConfig"
 }

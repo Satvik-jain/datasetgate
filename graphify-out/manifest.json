@@ -114,9 +114,9 @@
     "semantic_hash": ""
   },
   "src/datasetgate/parsers/__init__.py": {
-    "mtime": 1794256559.7517838,
-    "seen": 1794256629.7558923,
-    "ast_hash": "9fe69e5b7d6e2a25fa6014ccc5e8efa3",
+    "mtime": 1794256696.2185204,
+    "seen": 1794256719.284598,
+    "ast_hash": "a95bd182f2f12096cede09fd2aafafed",
     "semantic_hash": ""
   },
   "src/datasetgate/parsers/base.py": {
@@ -135,6 +135,18 @@
     "mtime": 1794256619.233289,
     "seen": 1794256629.7558923,
     "ast_hash": "4ff4dd1ef1d72e24db3ca011d09f956f",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/parsers/coco.py": {
+    "mtime": 1794256713.527484,
+    "seen": 1794256719.284598,
+    "ast_hash": "d1de2fc0d509d7c2e53e497f4f56e04a",
+    "semantic_hash": ""
+  },
+  "tests/test_coco_parser.py": {
+    "mtime": 1794256713.527484,
+    "seen": 1794256719.284598,
+    "ast_hash": "77f508000f53f6184fa553ccd6bfa76c",
     "semantic_hash": ""
   }
 }
