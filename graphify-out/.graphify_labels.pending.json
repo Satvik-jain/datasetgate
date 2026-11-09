@@ -1,10 +1,9 @@
 {
-  "0": "models.py",
+  "0": "DatasetManifest",
   "1": "YoloParser",
   "2": "audit",
-  "3": "ImageMetadata",
+  "3": "models.py",
   "4": "load_config",
-  "5": "test_cli.py",
   "6": "DatasetManifest",
   "7": "AGENTS.md",
   "8": "GEMINI.md",
