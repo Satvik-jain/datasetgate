@@ -66,9 +66,9 @@
     "semantic_hash": ""
   },
   "src/datasetgate/core/engine.py": {
-    "mtime": 1794256445.0420377,
-    "seen": 1794256545.3869045,
-    "ast_hash": "9eff34657a0bed9882f7d0dde14807eb",
+    "mtime": 1794257044.4413104,
+    "seen": 1794257054.84144,
+    "ast_hash": "e6189d5a8bc160dc7955dcd14fb2cd0e",
     "semantic_hash": ""
   },
   "src/datasetgate/core/models.py": {
@@ -207,6 +207,30 @@
     "mtime": 1794256903.8069148,
     "seen": 1794256916.1184187,
     "ast_hash": "f6862e8e8aa864b750ffb66675aa3953",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/reporting/__init__.py": {
+    "mtime": 1794256937.5481925,
+    "seen": 1794257054.84144,
+    "ast_hash": "9c1fed9268e0c73849dc104628375fe9",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/reporting/html.py": {
+    "mtime": 1794257044.4383097,
+    "seen": 1794257054.84144,
+    "ast_hash": "a6fef05b7c4687105472f874a6d8c0f9",
+    "semantic_hash": ""
+  },
+  "src/datasetgate/reporting/json.py": {
+    "mtime": 1794257044.36384,
+    "seen": 1794257054.84144,
+    "ast_hash": "06aeeaeb6b7cb2a8fc7b9ac10296c214",
+    "semantic_hash": ""
+  },
+  "tests/test_reporting.py": {
+    "mtime": 1794257044.366838,
+    "seen": 1794257054.84144,
+    "ast_hash": "dd56dca0c34589108870445fc02099ac",
     "semantic_hash": ""
   }
 }
