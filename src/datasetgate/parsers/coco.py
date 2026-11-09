@@ -23,6 +23,27 @@ from datasetgate.parsers.base import BaseParser
 class CocoParser(BaseParser):
     """Parser for COCO object detection format datasets."""
 
+    def __init__(self, json_cache: dict[Path, Any] | None = None) -> None:
+        self._json_cache: dict[Path, Any] = json_cache if json_cache is not None else {}
+        self._load_errors: dict[Path, Exception] = {}
+
+    def _load_json(self, json_path: Path) -> Any:
+        """Load and parse JSON file with caching to avoid repeated reads during audit."""
+        resolved = json_path.resolve()
+        if resolved in self._json_cache:
+            return self._json_cache[resolved]
+        if resolved in self._load_errors:
+            raise self._load_errors[resolved]
+
+        try:
+            with open(resolved, encoding="utf-8") as f:
+                data = json.load(f)
+            self._json_cache[resolved] = data
+            return data
+        except Exception as e:
+            self._load_errors[resolved] = e
+            raise
+
     def can_parse(self, dataset_path: Path) -> bool:
         """Heuristically determine if path is a COCO dataset or annotation file."""
         if dataset_path.is_file() and dataset_path.suffix.lower() == ".json":
@@ -42,11 +63,9 @@ class CocoParser(BaseParser):
     def _is_coco_json(self, json_path: Path) -> bool:
         """Check if json file contains standard COCO top-level keys."""
         try:
-            with open(json_path, encoding="utf-8") as f:
-                # Read a small chunk or parse structure safely
-                data = json.load(f)
-                if isinstance(data, dict):
-                    return "images" in data and "annotations" in data and "categories" in data
+            data = self._load_json(json_path)
+            if isinstance(data, dict):
+                return "images" in data and "annotations" in data and "categories" in data
         except Exception:
             return False
         return False
@@ -187,8 +206,7 @@ class CocoParser(BaseParser):
         )
 
         try:
-            with open(json_file, encoding="utf-8") as f:
-                data = json.load(f)
+            data = self._load_json(json_file)
         except Exception as e:
             findings.append(
                 Finding(

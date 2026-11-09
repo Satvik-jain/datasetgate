@@ -3,9 +3,9 @@
   "1": "DatasetGateConfig",
   "2": "html.py",
   "3": "calculate_dataset_fingerprint",
-  "4": "load_config",
+  "4": "generator.py",
   "5": "CocoParser",
-  "6": "main.py",
+  "6": "audit",
   "7": "AGENTS.md",
   "8": "GEMINI.md",
   "9": "DatasetGate",
@@ -16,6 +16,5 @@
   "14": "comparison/engine.py",
   "15": "steps",
   "16": "policy",
-  "17": "DatasetGate Architecture & Design",
   "18": "DatasetGate Rules & Defect Catalog"
 }

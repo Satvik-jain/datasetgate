@@ -138,15 +138,15 @@
     "semantic_hash": ""
   },
   "src/datasetgate/parsers/coco.py": {
-    "mtime": 1794259220.5446584,
-    "seen": 1794259278.2716708,
-    "ast_hash": "438548648b064fb3b7fa7f935cf4f654",
+    "mtime": 1794259975.7744117,
+    "seen": 1794260070.9987566,
+    "ast_hash": "6ac446e8de8344b49e044def17f8cc94",
     "semantic_hash": ""
   },
   "tests/test_coco_parser.py": {
-    "mtime": 1794256713.527484,
-    "seen": 1794256719.284598,
-    "ast_hash": "77f508000f53f6184fa553ccd6bfa76c",
+    "mtime": 1794260017.9737449,
+    "seen": 1794260070.9987566,
+    "ast_hash": "f61f8201103d704d60588c69c8b14c6e",
     "semantic_hash": ""
   },
   "src/datasetgate/validators/__init__.py": {

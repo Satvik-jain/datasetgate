@@ -136,3 +136,35 @@ def test_coco_parse_defects(tmp_path: Path):
     assert "NON_POSITIVE_BBOX_DIMENSION" in rule_ids
     assert "NEGATIVE_BBOX_COORDINATE" in rule_ids
     assert "BBOX_OUT_OF_BOUNDS" in rule_ids
+
+
+def test_coco_parser_json_caching_eliminates_redundant_loads(tmp_path: Path):
+    """Verify JSON files are parsed at most once across can_parse, discovery, and file parsing."""
+    from unittest.mock import patch
+
+    data = {
+        "images": [{"id": 1, "file_name": "0001.jpg", "width": 100, "height": 100}],
+        "categories": [{"id": 1, "name": "object"}],
+        "annotations": [{"id": 1, "image_id": 1, "category_id": 1, "bbox": [10, 10, 20, 20]}],
+    }
+    json_file = tmp_path / "instances_train.json"
+    json_file.write_text(json.dumps(data), encoding="utf-8")
+    (tmp_path / "0001.jpg").write_bytes(b"content")
+
+    parser = CocoParser()
+    config = DatasetGateConfig()
+
+    with patch("json.load", wraps=json.load) as mock_load:
+        # Step 1: can_parse checks candidates
+        can = parser.can_parse(tmp_path)
+        assert can is True
+        assert mock_load.call_count == 1
+
+        # Step 2: parse runs discovery and single file parsing
+        manifest = parser.parse(tmp_path, config)
+        assert len(manifest.images) == 1
+        # json.load should NOT have been called again! It was served from cache!
+        assert mock_load.call_count == 1
+
+    # Verify cache contains the resolved path
+    assert json_file.resolve() in parser._json_cache
