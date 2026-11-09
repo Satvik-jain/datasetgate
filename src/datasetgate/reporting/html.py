@@ -401,7 +401,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <footer>
-    DatasetGate v0.1.0 &bull; Local-first Computer Vision Dataset Validation & Release Gating &bull; Apache-2.0
+    DatasetGate v0.1.1 &bull; Local-first Computer Vision Dataset Validation & Release Gating &bull; Apache-2.0
   </footer>
 </div>
 

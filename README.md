@@ -93,16 +93,31 @@ Supports COCO object-detection JSON files:
 
 Requires Python 3.11+.
 
+> [!NOTE]
+> DatasetGate is currently distributed directly via its public GitHub repository ahead of public PyPI release.
+
+### Install from GitHub
+
+Install the release directly using `pip`:
+
 ```bash
-pip install datasetgate
+pip install "git+https://github.com/Satvik-jain/datasetgate.git@v0.1.1"
 ```
 
-Or install in editable mode for local development:
+Or install the latest development version from `main`:
+
+```bash
+pip install "git+https://github.com/Satvik-jain/datasetgate.git"
+```
+
+### Install for Local Development
+
+Clone the repository and install in editable mode with development dependencies:
 
 ```bash
 git clone https://github.com/Satvik-jain/datasetgate.git
 cd datasetgate
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 ---
@@ -316,7 +331,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install datasetgate
+      - run: pip install "git+https://github.com/Satvik-jain/datasetgate.git@v0.1.1"
       - run: datasetgate audit ./dataset --config datasetgate.yaml --output reports
       - uses: actions/upload-artifact@v4
         if: always()
