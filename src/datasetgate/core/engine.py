@@ -137,6 +137,26 @@ def run_audit(
     """Run full audit workflow and return exit code."""
     dataset_root = dataset_path.resolve()
 
+    # Pre-validate baseline snapshot if specified
+    baseline_snapshot: AuditSnapshot | None = None
+    if baseline_path is not None:
+        baseline_file = Path(baseline_path)
+        if not baseline_file.is_file():
+            err_console.print(
+                f"[bold red]Baseline error:[/bold red] Baseline snapshot file does not exist: [cyan]{baseline_path}[/cyan]"
+            )
+            return ExitCode.INVALID_USAGE
+
+        try:
+            with open(baseline_file, encoding="utf-8") as f:
+                baseline_data = json.load(f)
+            baseline_snapshot = AuditSnapshot.model_validate(baseline_data)
+        except Exception as e:
+            err_console.print(
+                f"[bold red]Baseline error:[/bold red] Baseline snapshot file is malformed or unreadable: [cyan]{baseline_path}[/cyan] ({e})"
+            )
+            return ExitCode.INVALID_USAGE
+
     if not quiet:
         console.print(
             f"[bold cyan]DatasetGate Audit[/bold cyan]: Scanning [yellow]{dataset_root}[/yellow]..."
@@ -182,21 +202,10 @@ def run_audit(
 
     # 6. Baseline comparison (if requested)
     comparison: ComparisonResult | None = None
-    if baseline_path is not None:
+    if baseline_snapshot is not None:
         from datasetgate.comparison.engine import compare_snapshots
 
-        baseline_file = Path(baseline_path)
-        if baseline_file.is_file():
-            try:
-                with open(baseline_file, encoding="utf-8") as f:
-                    baseline_data = json.load(f)
-                baseline_snapshot = AuditSnapshot.model_validate(baseline_data)
-                comparison = compare_snapshots(baseline_snapshot, snapshot)
-            except Exception as e:
-                if not quiet:
-                    err_console.print(
-                        f"[bold yellow]Warning:[/bold yellow] Could not compare against baseline {baseline_path}: {e}"
-                    )
+        comparison = compare_snapshots(baseline_snapshot, snapshot)
 
     # 7. Write reports
     out_dir = output_dir or Path(config.reporting.output_dir)

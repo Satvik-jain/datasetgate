@@ -121,3 +121,68 @@ def test_compare_cli_command(tmp_path: Path):
     assert result.exit_code == ExitCode.SUCCESS
     assert "DatasetGate Baseline Comparison" in result.stdout
     assert "+10" in result.stdout
+
+
+def test_audit_with_missing_baseline_fails(tmp_path: Path):
+    """Audit should fail with INVALID_USAGE (exit code 2) when --baseline does not exist."""
+    # Create minimal dataset
+    ds = tmp_path / "dataset"
+    (ds / "images" / "train").mkdir(parents=True)
+    (ds / "labels" / "train").mkdir(parents=True)
+
+    non_existent_baseline = tmp_path / "does_not_exist_report.json"
+
+    result = runner.invoke(
+        app,
+        ["audit", str(ds), "--baseline", str(non_existent_baseline)],
+    )
+    assert result.exit_code == ExitCode.INVALID_USAGE
+    assert "Baseline snapshot file does not exist" in result.stderr
+
+
+def test_audit_with_malformed_json_baseline_fails(tmp_path: Path):
+    """Audit should fail with INVALID_USAGE (exit code 2) when --baseline has malformed JSON."""
+    ds = tmp_path / "dataset"
+    (ds / "images" / "train").mkdir(parents=True)
+    (ds / "labels" / "train").mkdir(parents=True)
+
+    corrupt_baseline = tmp_path / "corrupt_baseline.json"
+    corrupt_baseline.write_text("{ not valid json !!! }", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["audit", str(ds), "--baseline", str(corrupt_baseline)],
+    )
+    assert result.exit_code == ExitCode.INVALID_USAGE
+    assert "Baseline snapshot file is malformed or unreadable" in result.stderr
+
+
+def test_audit_with_invalid_schema_baseline_fails(tmp_path: Path):
+    """Audit should fail with INVALID_USAGE (exit code 2) when --baseline has invalid snapshot schema."""
+    ds = tmp_path / "dataset"
+    (ds / "images" / "train").mkdir(parents=True)
+    (ds / "labels" / "train").mkdir(parents=True)
+
+    invalid_schema = tmp_path / "invalid_schema.json"
+    invalid_schema.write_text('{"foo": "bar", "unknown": 123}', encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["audit", str(ds), "--baseline", str(invalid_schema)],
+    )
+    assert result.exit_code == ExitCode.INVALID_USAGE
+    assert "Baseline snapshot file is malformed or unreadable" in result.stderr
+
+
+def test_compare_cli_with_malformed_baseline_fails(tmp_path: Path):
+    """compare command should fail with INVALID_USAGE when baseline is malformed."""
+    malformed_base = tmp_path / "malformed.json"
+    malformed_base.write_text("{bad json}", encoding="utf-8")
+
+    curr_file = tmp_path / "curr.json"
+    curr_snap = make_snapshot(fingerprint="curr222")
+    curr_file.write_text(curr_snap.model_dump_json(), encoding="utf-8")
+
+    result = runner.invoke(app, ["compare", str(malformed_base), str(curr_file)])
+    assert result.exit_code == ExitCode.INVALID_USAGE
+    assert "Failed to load baseline JSON" in result.stderr
