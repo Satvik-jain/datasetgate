@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datasetgate.core.config import DatasetGateConfig
+from datasetgate.core.config import DatasetGateConfig, PolicyAction
 from datasetgate.core.models import (
     DatasetManifest,
     DatasetStatistics,
@@ -33,11 +33,34 @@ class PolicyEngine:
         errors_list: list[str] = []
         skipped_checks: list[str] = []
 
-        # 1. Apply user rule severity overrides
+        # 1. Apply configured rule policies
+        policy_actions: dict[str, PolicyAction] = {
+            "CORRUPTED_IMAGE": policy.corrupted_image_policy,
+            "MISSING_IMAGE_FILE": policy.missing_image_policy,
+            "BBOX_OUT_OF_BOUNDS": policy.out_of_bounds_policy,
+            "EXACT_DUPLICATE_IMAGE": policy.duplicate_policy,
+            "SPLIT_LEAKAGE": policy.split_leakage_policy,
+        }
+
+        adjusted_findings: list[Finding] = []
+        for f in all_findings:
+            if f.rule_id in policy_actions and f.rule_id not in policy.rule_severities:
+                action = policy_actions[f.rule_id]
+                if action == PolicyAction.IGNORE:
+                    continue
+                elif action == PolicyAction.WARN:
+                    f.severity = Severity.WARNING
+                elif action == PolicyAction.FAIL:
+                    f.severity = Severity.ERROR
+            adjusted_findings.append(f)
+
+        # 2. Apply user rule severity overrides (highest priority)
         if policy.rule_severities:
-            for f in all_findings:
+            for f in adjusted_findings:
                 if f.rule_id in policy.rule_severities:
                     f.severity = policy.rule_severities[f.rule_id]
+
+        all_findings = adjusted_findings
 
         # 2. Check: require_all_classes_in_train
         if policy.require_all_classes_in_train:
@@ -210,7 +233,9 @@ class PolicyEngine:
                 )
             )
 
-        has_corrupt = any(f.rule_id == "CORRUPTED_IMAGE" for f in all_findings)
+        has_corrupt = any(
+            f.rule_id == "CORRUPTED_IMAGE" and f.severity == Severity.ERROR for f in all_findings
+        )
         if not has_corrupt and len(manifest.images) > 0:
             passed_checks.append("images_decodable")
             check_results.append(
@@ -218,11 +243,13 @@ class PolicyEngine:
                     name="images_decodable",
                     passed=True,
                     status="PASSED",
-                    message="All image files are readable and valid.",
+                    message="No unreadable or corrupted image errors.",
                 )
             )
 
-        has_oob = any(f.rule_id == "BBOX_OUT_OF_BOUNDS" for f in all_findings)
+        has_oob = any(
+            f.rule_id == "BBOX_OUT_OF_BOUNDS" and f.severity == Severity.ERROR for f in all_findings
+        )
         if not has_oob and stats.total_annotations > 0:
             passed_checks.append("bounding_boxes_within_bounds")
             check_results.append(
@@ -230,7 +257,7 @@ class PolicyEngine:
                     name="bounding_boxes_within_bounds",
                     passed=True,
                     status="PASSED",
-                    message="All bounding boxes fall within image boundaries.",
+                    message="No bounding box boundary errors.",
                 )
             )
 

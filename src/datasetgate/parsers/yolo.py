@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from datasetgate.core.config import DatasetGateConfig
+from datasetgate.core.config import DatasetGateConfig, PolicyAction
 from datasetgate.core.models import (
     BoundingBox,
     DatasetManifest,
@@ -125,6 +125,7 @@ class YoloParser(BaseParser):
                         rel_img_path=rel_img_path,
                         split=split_name,
                         known_classes_count=len(classes) if classes else None,
+                        config=config,
                     )
                     findings.extend(parse_findings)
                     annotations.append(
@@ -315,10 +316,12 @@ class YoloParser(BaseParser):
         rel_img_path: str,
         split: str,
         known_classes_count: int | None,
+        config: DatasetGateConfig | None = None,
     ) -> tuple[list[BoundingBox], bool, list[Finding]]:
         """Parse YOLO annotation text file into BoundingBox list and detect format defects."""
         findings: list[Finding] = []
         boxes: list[BoundingBox] = []
+        oob_action = config.policy.out_of_bounds_policy if config else PolicyAction.FAIL
 
         try:
             content = lbl_path.read_text(encoding="utf-8")
@@ -495,24 +498,28 @@ class YoloParser(BaseParser):
             # Allow tiny floating point epsilon tolerance (e.g. 1e-4)
             eps = 1e-4
             if x_min < -eps or y_min < -eps or x_max > 1.0 + eps or y_max > 1.0 + eps:
-                findings.append(
-                    Finding(
-                        rule_id="BBOX_OUT_OF_BOUNDS",
-                        severity=Severity.ERROR,
-                        category=FindingCategory.ANNOTATION_INTEGRITY,
-                        message=(
-                            f"Bounding box [{x_min:.3f}, {y_min:.3f}, {x_max:.3f}, {y_max:.3f}] "
-                            f"extends outside normalized image bounds at {rel_lbl_path}:{line_num}."
-                        ),
-                        file_path=rel_lbl_path,
-                        split=split,
-                        metadata={
-                            "line_number": line_num,
-                            "bbox": [x_min, y_min, x_max, y_max],
-                            "image_path": rel_img_path,
-                        },
+                if oob_action != PolicyAction.IGNORE:
+                    oob_sev = (
+                        Severity.ERROR if oob_action == PolicyAction.FAIL else Severity.WARNING
                     )
-                )
+                    findings.append(
+                        Finding(
+                            rule_id="BBOX_OUT_OF_BOUNDS",
+                            severity=oob_sev,
+                            category=FindingCategory.ANNOTATION_INTEGRITY,
+                            message=(
+                                f"Bounding box [{x_min:.3f}, {y_min:.3f}, {x_max:.3f}, {y_max:.3f}] "
+                                f"extends outside normalized image bounds at {rel_lbl_path}:{line_num}."
+                            ),
+                            file_path=rel_lbl_path,
+                            split=split,
+                            metadata={
+                                "line_number": line_num,
+                                "bbox": [x_min, y_min, x_max, y_max],
+                                "image_path": rel_img_path,
+                            },
+                        )
+                    )
 
             boxes.append(
                 BoundingBox(

@@ -126,9 +126,9 @@
     "semantic_hash": ""
   },
   "src/datasetgate/parsers/yolo.py": {
-    "mtime": 1794256619.2342901,
-    "seen": 1794256629.7558923,
-    "ast_hash": "d861c52d7a580975a76994267581c8ca",
+    "mtime": 1794259220.548947,
+    "seen": 1794259278.2716708,
+    "ast_hash": "8a05f7c9b8efe91a91a593ddf7986644",
     "semantic_hash": ""
   },
   "tests/test_yolo_parser.py": {
@@ -138,9 +138,9 @@
     "semantic_hash": ""
   },
   "src/datasetgate/parsers/coco.py": {
-    "mtime": 1794256713.527484,
-    "seen": 1794256719.284598,
-    "ast_hash": "d1de2fc0d509d7c2e53e497f4f56e04a",
+    "mtime": 1794259220.5446584,
+    "seen": 1794259278.2716708,
+    "ast_hash": "438548648b064fb3b7fa7f935cf4f654",
     "semantic_hash": ""
   },
   "tests/test_coco_parser.py": {
@@ -156,9 +156,9 @@
     "semantic_hash": ""
   },
   "src/datasetgate/validators/annotations.py": {
-    "mtime": 1794256813.5804565,
-    "seen": 1794256827.9340212,
-    "ast_hash": "f510af3533d0a8439e6e226ffc28a4b2",
+    "mtime": 1794259220.5501134,
+    "seen": 1794259278.2716708,
+    "ast_hash": "6e90e76ab911f3848266c84270eee120",
     "semantic_hash": ""
   },
   "src/datasetgate/validators/base.py": {
@@ -174,15 +174,15 @@
     "semantic_hash": ""
   },
   "src/datasetgate/validators/image_integrity.py": {
-    "mtime": 1794256813.5180514,
-    "seen": 1794256827.9340212,
-    "ast_hash": "5bb4be6b4284aa23cc03fb059f321800",
+    "mtime": 1794259220.5446584,
+    "seen": 1794259278.2716708,
+    "ast_hash": "29cf76231f75e5110575bb18ea09dafb",
     "semantic_hash": ""
   },
   "tests/test_validators.py": {
-    "mtime": 1794256813.5220506,
-    "seen": 1794256827.9340212,
-    "ast_hash": "bad6b86f9d60a6c4c79208b70f2c355d",
+    "mtime": 1794259203.0422254,
+    "seen": 1794259278.2716708,
+    "ast_hash": "316cf8c342426d516d83f7fbb18bca78",
     "semantic_hash": ""
   },
   "src/datasetgate/policies/__init__.py": {
@@ -192,9 +192,9 @@
     "semantic_hash": ""
   },
   "src/datasetgate/policies/engine.py": {
-    "mtime": 1794256903.8088057,
-    "seen": 1794256916.1184187,
-    "ast_hash": "62e685e0fc36b9c19e95616530c45b77",
+    "mtime": 1794259235.603718,
+    "seen": 1794259278.2716708,
+    "ast_hash": "27f764c3f37ffb527b99d59c308ba4c0",
     "semantic_hash": ""
   },
   "src/datasetgate/validators/distribution.py": {
@@ -204,9 +204,9 @@
     "semantic_hash": ""
   },
   "tests/test_policy_engine.py": {
-    "mtime": 1794256903.8069148,
-    "seen": 1794256916.1184187,
-    "ast_hash": "f6862e8e8aa864b750ffb66675aa3953",
+    "mtime": 1794259244.637519,
+    "seen": 1794259278.2716708,
+    "ast_hash": "e19de7d9295f8eba90b26e8c99189d09",
     "semantic_hash": ""
   },
   "src/datasetgate/reporting/__init__.py": {
@@ -228,9 +228,9 @@
     "semantic_hash": ""
   },
   "tests/test_reporting.py": {
-    "mtime": 1794257044.366838,
-    "seen": 1794257054.84144,
-    "ast_hash": "dd56dca0c34589108870445fc02099ac",
+    "mtime": 1794259220.5436552,
+    "seen": 1794259278.2716708,
+    "ast_hash": "827a0820b8c3ca9803ab453f18987873",
     "semantic_hash": ""
   },
   "tests/test_comparison.py": {

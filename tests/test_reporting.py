@@ -115,3 +115,48 @@ def test_run_audit_end_to_end(tmp_path: Path):
     assert exit_code == 0
     assert (report_dir / "report.json").exists()
     assert (report_dir / "report.html").exists()
+
+
+def test_run_audit_policy_actions_exit_codes(tmp_path: Path):
+    # Setup miniature YOLO dataset with deliberate out-of-bounds bbox
+    img_dir = tmp_path / "images" / "train"
+    lbl_dir = tmp_path / "labels" / "train"
+    img_dir.mkdir(parents=True)
+    lbl_dir.mkdir(parents=True)
+
+    img = Image.new("RGB", (64, 64), color="red")
+    img.save(img_dir / "oob.png")
+    # center 0.9, width 0.4 -> extends to 1.1 (out of bounds)
+    (lbl_dir / "oob.txt").write_text("0 0.9 0.5 0.4 0.2\n", encoding="utf-8")
+
+    yaml_file = tmp_path / "data.yaml"
+    yaml_file.write_text("train: images/train\nnames: ['object']\nnc: 1\n", encoding="utf-8")
+
+    # 1. Action = fail -> ExitCode.GATE_FAILED (1)
+    cfg_fail = DatasetGateConfig()
+    cfg_fail.policy.out_of_bounds_policy = "fail"
+    cfg_fail.policy.fail_on = ["error"]
+    res_fail = run_audit(
+        dataset_path=tmp_path, config=cfg_fail, output_dir=tmp_path / "rep_fail", quiet=True
+    )
+    assert res_fail == 1
+
+    # 2. Action = warn -> ExitCode.SUCCESS (0) because fail_on is only ['error']
+    cfg_warn = DatasetGateConfig()
+    cfg_warn.policy.out_of_bounds_policy = "warn"
+    cfg_warn.policy.fail_on = ["error"]
+    res_warn = run_audit(
+        dataset_path=tmp_path, config=cfg_warn, output_dir=tmp_path / "rep_warn", quiet=True
+    )
+    assert res_warn == 0
+
+    # 3. Action = ignore -> ExitCode.SUCCESS (0) and no finding in report
+    cfg_ignore = DatasetGateConfig()
+    cfg_ignore.policy.out_of_bounds_policy = "ignore"
+    cfg_ignore.policy.fail_on = ["error"]
+    res_ignore = run_audit(
+        dataset_path=tmp_path, config=cfg_ignore, output_dir=tmp_path / "rep_ignore", quiet=True
+    )
+    assert res_ignore == 0
+    rep_data = json.loads((tmp_path / "rep_ignore" / "report.json").read_text(encoding="utf-8"))
+    assert not any(f["rule_id"] == "BBOX_OUT_OF_BOUNDS" for f in rep_data["findings"])

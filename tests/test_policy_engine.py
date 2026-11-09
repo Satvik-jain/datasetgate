@@ -6,6 +6,7 @@ from datasetgate.core.config import DatasetGateConfig
 from datasetgate.core.models import (
     BoundingBox,
     DatasetManifest,
+    DatasetStatistics,
     Finding,
     FindingCategory,
     ImageAnnotation,
@@ -198,3 +199,135 @@ def test_policy_engine_severity_override():
     assert updated_findings[0].severity == Severity.WARNING
     assert res.passed is True
     assert res.status == "PASSED"
+
+
+def test_corrupted_image_policy_actions():
+    manifest = DatasetManifest(format="yolo", dataset_root=Path("/fake"))
+    stats = DatasetStatistics(total_images=1)
+    engine = PolicyEngine()
+
+    raw_finding = Finding(
+        rule_id="CORRUPTED_IMAGE",
+        severity=Severity.ERROR,
+        category=FindingCategory.IMAGE_INTEGRITY,
+        message="Corrupted header",
+    )
+
+    # Test ignore
+    cfg_ignore = DatasetGateConfig()
+    cfg_ignore.policy.corrupted_image_policy = "ignore"
+    findings, res = engine.evaluate(manifest, stats, [raw_finding], cfg_ignore)
+    assert len(findings) == 0
+    assert res.passed is True
+
+    # Test warn
+    cfg_warn = DatasetGateConfig()
+    cfg_warn.policy.corrupted_image_policy = "warn"
+    findings, res = engine.evaluate(manifest, stats, [raw_finding], cfg_warn)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.WARNING
+    assert res.passed is True  # default fail_on: [error]
+
+    # Test fail
+    cfg_fail = DatasetGateConfig()
+    cfg_fail.policy.corrupted_image_policy = "fail"
+    findings, res = engine.evaluate(manifest, stats, [raw_finding], cfg_fail)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.ERROR
+    assert res.passed is False
+
+
+def test_missing_image_policy_actions():
+    manifest = DatasetManifest(format="coco", dataset_root=Path("/fake"))
+    stats = DatasetStatistics(total_images=1)
+    engine = PolicyEngine()
+
+    raw_finding = Finding(
+        rule_id="MISSING_IMAGE_FILE",
+        severity=Severity.ERROR,
+        category=FindingCategory.IMAGE_INTEGRITY,
+        message="File not on disk",
+    )
+
+    # Test ignore
+    cfg_ignore = DatasetGateConfig()
+    cfg_ignore.policy.missing_image_policy = "ignore"
+    findings, res = engine.evaluate(manifest, stats, [raw_finding], cfg_ignore)
+    assert len(findings) == 0
+    assert res.passed is True
+
+    # Test warn
+    cfg_warn = DatasetGateConfig()
+    cfg_warn.policy.missing_image_policy = "warn"
+    findings, res = engine.evaluate(manifest, stats, [raw_finding], cfg_warn)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.WARNING
+    assert res.passed is True
+
+    # Test fail
+    cfg_fail = DatasetGateConfig()
+    cfg_fail.policy.missing_image_policy = "fail"
+    findings, res = engine.evaluate(manifest, stats, [raw_finding], cfg_fail)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.ERROR
+    assert res.passed is False
+
+
+def test_out_of_bounds_policy_actions():
+    manifest = DatasetManifest(format="yolo", dataset_root=Path("/fake"))
+    stats = DatasetStatistics(total_images=1, total_annotations=1)
+    engine = PolicyEngine()
+
+    raw_finding = Finding(
+        rule_id="BBOX_OUT_OF_BOUNDS",
+        severity=Severity.ERROR,
+        category=FindingCategory.ANNOTATION_INTEGRITY,
+        message="Box outside [0, 1]",
+    )
+
+    # Test ignore
+    cfg_ignore = DatasetGateConfig()
+    cfg_ignore.policy.out_of_bounds_policy = "ignore"
+    findings, res = engine.evaluate(manifest, stats, [raw_finding], cfg_ignore)
+    assert len(findings) == 0
+    assert res.passed is True
+
+    # Test warn
+    cfg_warn = DatasetGateConfig()
+    cfg_warn.policy.out_of_bounds_policy = "warn"
+    findings, res = engine.evaluate(manifest, stats, [raw_finding], cfg_warn)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.WARNING
+    assert res.passed is True
+
+    # Test fail
+    cfg_fail = DatasetGateConfig()
+    cfg_fail.policy.out_of_bounds_policy = "fail"
+    findings, res = engine.evaluate(manifest, stats, [raw_finding], cfg_fail)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.ERROR
+    assert res.passed is False
+
+
+def test_rule_severities_overrides_policy_action():
+    manifest = DatasetManifest(format="yolo", dataset_root=Path("/fake"))
+    stats = DatasetStatistics(total_images=1, total_annotations=1)
+    engine = PolicyEngine()
+
+    raw_finding = Finding(
+        rule_id="BBOX_OUT_OF_BOUNDS",
+        severity=Severity.ERROR,
+        category=FindingCategory.ANNOTATION_INTEGRITY,
+        message="Box outside [0, 1]",
+    )
+
+    # Policy action says warn, but rule_severities says error
+    cfg = DatasetGateConfig()
+    cfg.policy.out_of_bounds_policy = "warn"
+    cfg.policy.rule_severities = {"BBOX_OUT_OF_BOUNDS": Severity.ERROR}
+    cfg.policy.fail_on = [Severity.ERROR]
+
+    findings, res = engine.evaluate(manifest, stats, [raw_finding], cfg)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.ERROR
+    assert res.passed is False

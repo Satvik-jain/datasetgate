@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PIL import Image, UnidentifiedImageError
 
-from datasetgate.core.config import DatasetGateConfig
+from datasetgate.core.config import DatasetGateConfig, PolicyAction
 from datasetgate.core.models import DatasetManifest, Finding, FindingCategory, Severity
 from datasetgate.validators.base import BaseValidator
 
@@ -16,6 +16,8 @@ class ImageIntegrityValidator(BaseValidator):
         findings: list[Finding] = []
         dataset_root = manifest.dataset_root
         allowed_extensions = {ext.lower() for ext in config.dataset.image_extensions}
+        missing_action = config.policy.missing_image_policy
+        corrupted_action = config.policy.corrupted_image_policy
 
         for img_meta in manifest.images:
             abs_path = (dataset_root / img_meta.relative_path).resolve()
@@ -24,16 +26,20 @@ class ImageIntegrityValidator(BaseValidator):
             if not abs_path.is_file():
                 img_meta.is_valid = False
                 img_meta.error_message = "File does not exist on disk"
-                findings.append(
-                    Finding(
-                        rule_id="MISSING_IMAGE_FILE",
-                        severity=Severity.ERROR,
-                        category=FindingCategory.IMAGE_INTEGRITY,
-                        message=f"Image file '{img_meta.relative_path}' is missing on disk.",
-                        file_path=img_meta.relative_path,
-                        split=img_meta.split,
+                if missing_action != PolicyAction.IGNORE:
+                    missing_sev = (
+                        Severity.ERROR if missing_action == PolicyAction.FAIL else Severity.WARNING
                     )
-                )
+                    findings.append(
+                        Finding(
+                            rule_id="MISSING_IMAGE_FILE",
+                            severity=missing_sev,
+                            category=FindingCategory.IMAGE_INTEGRITY,
+                            message=f"Image file '{img_meta.relative_path}' is missing on disk.",
+                            file_path=img_meta.relative_path,
+                            split=img_meta.split,
+                        )
+                    )
                 continue
 
             # 2. Check empty file (0 bytes)
@@ -103,16 +109,22 @@ class ImageIntegrityValidator(BaseValidator):
             except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as e:
                 img_meta.is_valid = False
                 img_meta.error_message = str(e)
-                findings.append(
-                    Finding(
-                        rule_id="CORRUPTED_IMAGE",
-                        severity=Severity.ERROR,
-                        category=FindingCategory.IMAGE_INTEGRITY,
-                        message=f"Corrupted or unreadable image file '{img_meta.relative_path}': {e}",
-                        file_path=img_meta.relative_path,
-                        split=img_meta.split,
-                        metadata={"error": str(e)},
+                if corrupted_action != PolicyAction.IGNORE:
+                    corrupted_sev = (
+                        Severity.ERROR
+                        if corrupted_action == PolicyAction.FAIL
+                        else Severity.WARNING
                     )
-                )
+                    findings.append(
+                        Finding(
+                            rule_id="CORRUPTED_IMAGE",
+                            severity=corrupted_sev,
+                            category=FindingCategory.IMAGE_INTEGRITY,
+                            message=f"Corrupted or unreadable image file '{img_meta.relative_path}': {e}",
+                            file_path=img_meta.relative_path,
+                            split=img_meta.split,
+                            metadata={"error": str(e)},
+                        )
+                    )
 
         return findings

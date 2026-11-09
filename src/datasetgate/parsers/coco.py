@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from datasetgate.core.config import DatasetGateConfig
+from datasetgate.core.config import DatasetGateConfig, PolicyAction
 from datasetgate.core.models import (
     BoundingBox,
     DatasetManifest,
@@ -302,17 +302,22 @@ class CocoParser(BaseParser):
             resolved_file = self._resolve_image_path(file_name, split_name, dataset_root, json_file)
             if resolved_file is None:
                 rel_img_path = f"{split_name}/{file_name}" if file_name else f"image_id_{img_id}"
-                findings.append(
-                    Finding(
-                        rule_id="MISSING_IMAGE_FILE",
-                        severity=Severity.ERROR,
-                        category=FindingCategory.IMAGE_INTEGRITY,
-                        message=f"Referenced image file '{file_name}' (ID {img_id}) not found on disk in split '{split_name}'.",
-                        file_path=rel_img_path,
-                        split=split_name,
-                        metadata={"image_id": img_id, "file_name": file_name},
+                missing_action = config.policy.missing_image_policy
+                if missing_action != PolicyAction.IGNORE:
+                    missing_sev = (
+                        Severity.ERROR if missing_action == PolicyAction.FAIL else Severity.WARNING
                     )
-                )
+                    findings.append(
+                        Finding(
+                            rule_id="MISSING_IMAGE_FILE",
+                            severity=missing_sev,
+                            category=FindingCategory.IMAGE_INTEGRITY,
+                            message=f"Referenced image file '{file_name}' (ID {img_id}) not found on disk in split '{split_name}'.",
+                            file_path=rel_img_path,
+                            split=split_name,
+                            metadata={"image_id": img_id, "file_name": file_name},
+                        )
+                    )
                 image_metadata_list.append(
                     ImageMetadata(
                         relative_path=rel_img_path,
@@ -485,25 +490,30 @@ class CocoParser(BaseParser):
             img_h = img_info.get("height")
             if isinstance(img_w, (int, float)) and isinstance(img_h, (int, float)):
                 if x + w > img_w or y + h > img_h:
-                    findings.append(
-                        Finding(
-                            rule_id="BBOX_OUT_OF_BOUNDS",
-                            severity=Severity.ERROR,
-                            category=FindingCategory.ANNOTATION_INTEGRITY,
-                            message=(
-                                f"Annotation {ann_id} bbox [{x}, {y}, {w}, {h}] extends outside "
-                                f"image dimensions ({img_w}x{img_h})."
-                            ),
-                            file_path=rel_json_path,
-                            split=split_name,
-                            metadata={
-                                "annotation_id": ann_id,
-                                "bbox": [x, y, w, h],
-                                "image_id": image_id,
-                                "image_dimensions": [img_w, img_h],
-                            },
+                    oob_action = config.policy.out_of_bounds_policy
+                    if oob_action != PolicyAction.IGNORE:
+                        oob_sev = (
+                            Severity.ERROR if oob_action == PolicyAction.FAIL else Severity.WARNING
                         )
-                    )
+                        findings.append(
+                            Finding(
+                                rule_id="BBOX_OUT_OF_BOUNDS",
+                                severity=oob_sev,
+                                category=FindingCategory.ANNOTATION_INTEGRITY,
+                                message=(
+                                    f"Annotation {ann_id} bbox [{x}, {y}, {w}, {h}] extends outside "
+                                    f"image dimensions ({img_w}x{img_h})."
+                                ),
+                                file_path=rel_json_path,
+                                split=split_name,
+                                metadata={
+                                    "annotation_id": ann_id,
+                                    "bbox": [x, y, w, h],
+                                    "image_id": image_id,
+                                    "image_dimensions": [img_w, img_h],
+                                },
+                            )
+                        )
 
             # Store box (normalize if image dims available, otherwise keep absolute)
             box_obj = BoundingBox(

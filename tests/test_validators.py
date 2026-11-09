@@ -66,6 +66,49 @@ def test_image_integrity_validator(tmp_path: Path):
     assert valid_meta.height == 48
 
 
+def test_image_integrity_policy_actions(tmp_path: Path):
+    corrupted_jpg = tmp_path / "broken.jpg"
+    corrupted_jpg.write_bytes(b"bad_header")
+
+    manifest = DatasetManifest(
+        format="yolo",
+        dataset_root=tmp_path,
+        splits=["train"],
+        classes={0: "obj"},
+        images=[
+            ImageMetadata(relative_path="broken.jpg", split="train"),
+            ImageMetadata(relative_path="missing.jpg", split="train"),
+        ],
+    )
+
+    validator = ImageIntegrityValidator()
+
+    # Test ignore
+    cfg_ignore = DatasetGateConfig()
+    cfg_ignore.policy.corrupted_image_policy = PolicyAction.IGNORE
+    cfg_ignore.policy.missing_image_policy = PolicyAction.IGNORE
+    findings = validator.validate(manifest, cfg_ignore)
+    assert not any(f.rule_id in ("CORRUPTED_IMAGE", "MISSING_IMAGE_FILE") for f in findings)
+
+    # Test warn
+    cfg_warn = DatasetGateConfig()
+    cfg_warn.policy.corrupted_image_policy = PolicyAction.WARN
+    cfg_warn.policy.missing_image_policy = PolicyAction.WARN
+    findings = validator.validate(manifest, cfg_warn)
+    severities = {f.rule_id: f.severity for f in findings}
+    assert severities.get("CORRUPTED_IMAGE") == Severity.WARNING
+    assert severities.get("MISSING_IMAGE_FILE") == Severity.WARNING
+
+    # Test fail
+    cfg_fail = DatasetGateConfig()
+    cfg_fail.policy.corrupted_image_policy = PolicyAction.FAIL
+    cfg_fail.policy.missing_image_policy = PolicyAction.FAIL
+    findings = validator.validate(manifest, cfg_fail)
+    severities = {f.rule_id: f.severity for f in findings}
+    assert severities.get("CORRUPTED_IMAGE") == Severity.ERROR
+    assert severities.get("MISSING_IMAGE_FILE") == Severity.ERROR
+
+
 def test_duplicate_validator_intra_split(tmp_path: Path):
     png_bytes = create_sample_png_bytes(50, 50, "green")
     img1 = tmp_path / "train_1.png"

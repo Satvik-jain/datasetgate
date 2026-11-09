@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datasetgate.core.config import DatasetGateConfig
+from datasetgate.core.config import DatasetGateConfig, PolicyAction
 from datasetgate.core.models import DatasetManifest, Finding, FindingCategory, Severity
 from datasetgate.validators.base import BaseValidator
 
@@ -12,6 +12,7 @@ class AnnotationValidator(BaseValidator):
 
     def validate(self, manifest: DatasetManifest, config: DatasetGateConfig) -> list[Finding]:
         findings: list[Finding] = list(manifest.discovery_warnings)
+        oob_action = config.policy.out_of_bounds_policy
 
         # Image lookup for dimension checking
         img_by_path = {img.relative_path: img for img in manifest.images}
@@ -60,22 +61,28 @@ class AnnotationValidator(BaseValidator):
                             for f in findings
                         )
                         if not already_reported:
-                            findings.append(
-                                Finding(
-                                    rule_id="BBOX_OUT_OF_BOUNDS",
-                                    severity=Severity.ERROR,
-                                    category=FindingCategory.ANNOTATION_INTEGRITY,
-                                    message=(
-                                        f"Bounding box [{box.x_min}, {box.y_min}, {box.width}, {box.height}] "
-                                        f"exceeds actual image dimensions ({img.width}x{img.height}) for '{ann.image_relative_path}'."
-                                    ),
-                                    file_path=ann.image_relative_path,
-                                    split=ann.split,
-                                    metadata={
-                                        "bbox": [box.x_min, box.y_min, box.width, box.height],
-                                        "actual_size": [img.width, img.height],
-                                    },
+                            if oob_action != PolicyAction.IGNORE:
+                                oob_sev = (
+                                    Severity.ERROR
+                                    if oob_action == PolicyAction.FAIL
+                                    else Severity.WARNING
                                 )
-                            )
+                                findings.append(
+                                    Finding(
+                                        rule_id="BBOX_OUT_OF_BOUNDS",
+                                        severity=oob_sev,
+                                        category=FindingCategory.ANNOTATION_INTEGRITY,
+                                        message=(
+                                            f"Bounding box [{box.x_min}, {box.y_min}, {box.width}, {box.height}] "
+                                            f"exceeds actual image dimensions ({img.width}x{img.height}) for '{ann.image_relative_path}'."
+                                        ),
+                                        file_path=ann.image_relative_path,
+                                        split=ann.split,
+                                        metadata={
+                                            "bbox": [box.x_min, box.y_min, box.width, box.height],
+                                            "actual_size": [img.width, img.height],
+                                        },
+                                    )
+                                )
 
         return findings
