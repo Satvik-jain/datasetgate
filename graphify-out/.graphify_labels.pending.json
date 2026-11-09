@@ -2,7 +2,7 @@
   "0": "models.py",
   "1": "YoloParser",
   "2": "audit",
-  "3": "PolicyConfig",
+  "3": "ImageMetadata",
   "4": "load_config",
   "5": "test_cli.py",
   "6": "DatasetManifest",
