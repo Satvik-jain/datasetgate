@@ -1,8 +1,8 @@
 {
-  "0": "DatasetManifest",
-  "1": "YoloParser",
-  "2": "core/engine.py",
-  "3": ".parse",
+  "0": "Finding",
+  "1": "DatasetGateConfig",
+  "2": "html.py",
+  "3": "calculate_dataset_fingerprint",
   "4": "load_config",
   "5": "CocoParser",
   "6": "main.py",
@@ -13,11 +13,8 @@
   "11": "comparison/__init__.py",
   "12": "datasetgate",
   "13": "models.py",
-  "14": "test_comparison.py",
+  "14": "PolicyConfig",
   "15": "steps",
   "16": "policy",
-  "17": "generator.py",
-  "18": "DatasetGate Rules & Defect Catalog",
-  "19": "ImageMetadata",
-  "20": "DatasetGate Architecture & Design"
+  "18": "DatasetGate Rules & Defect Catalog"
 }

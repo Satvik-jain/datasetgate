@@ -66,9 +66,9 @@
     "semantic_hash": ""
   },
   "src/datasetgate/core/engine.py": {
-    "mtime": 1794257044.4413104,
-    "seen": 1794257054.84144,
-    "ast_hash": "e6189d5a8bc160dc7955dcd14fb2cd0e",
+    "mtime": 1794259666.3794322,
+    "seen": 1794259704.0991716,
+    "ast_hash": "f3bda5e5342319cea7a6cef9201bb5bf",
     "semantic_hash": ""
   },
   "src/datasetgate/core/models.py": {
@@ -291,6 +291,12 @@
     "mtime": 1794257195.1840823,
     "seen": 1794257283.1199107,
     "ast_hash": "a0eec2443645504375e173ceae552372",
+    "semantic_hash": ""
+  },
+  "tests/test_fingerprint.py": {
+    "mtime": 1794259649.8105776,
+    "seen": 1794259704.1045034,
+    "ast_hash": "34a741c01e43ee6aea2451a94596c1b0",
     "semantic_hash": ""
   }
 }

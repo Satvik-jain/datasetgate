@@ -33,25 +33,68 @@ console = Console()
 err_console = Console(stderr=True)
 
 
-def calculate_dataset_fingerprint(manifest: DatasetManifest, stats: DatasetStatistics) -> str:
-    """Compute deterministic SHA-256 fingerprint for a dataset version."""
+def calculate_dataset_fingerprint(
+    manifest: DatasetManifest, stats: DatasetStatistics | None = None
+) -> str:
+    """Compute deterministic SHA-256 content fingerprint for a dataset version."""
     h = hashlib.sha256()
 
-    # Sort images deterministically by relative path
-    for img in sorted(manifest.images, key=lambda x: x.relative_path):
+    # 1. Dataset format (normalized)
+    h.update(f"format:{manifest.format.strip().lower()}\n".encode())
+
+    # 2. Splits (sorted)
+    splits = sorted(set(manifest.splits))
+    h.update(f"splits:{','.join(splits)}\n".encode())
+
+    # 3. Classes (sorted by integer class ID)
+    for cid, name in sorted(manifest.classes.items(), key=lambda item: item[0]):
+        h.update(f"class:{cid}:{name.strip()}\n".encode())
+
+    # 4. Images (deterministically sorted by normalized relative path)
+    for img in sorted(manifest.images, key=lambda x: x.relative_path.replace("\\", "/")):
+        norm_path = img.relative_path.replace("\\", "/")
+        h.update(f"img:{norm_path}:{img.split}:{img.sha256 or ''}:{img.file_size_bytes}\n".encode())
+
+    # 5. Annotations (deterministically sorted by normalized image relative path)
+    for ann in sorted(manifest.annotations, key=lambda x: x.image_relative_path.replace("\\", "/")):
+        norm_img_path = ann.image_relative_path.replace("\\", "/")
+        norm_lbl_path = (
+            ann.label_relative_path.replace("\\", "/") if ann.label_relative_path else ""
+        )
         h.update(
-            f"{img.relative_path}:{img.split}:{img.sha256 or ''}:{img.file_size_bytes}".encode()
+            f"ann:{norm_img_path}:{ann.split}:{ann.has_label_file}:{ann.is_empty_label}:{norm_lbl_path}\n".encode()
+        )
+        # Deterministically sort bounding boxes within this image
+        sorted_boxes = sorted(
+            ann.boxes,
+            key=lambda b: (
+                b.class_id,
+                round(b.x_min, 6),
+                round(b.y_min, 6),
+                round(b.x_max, 6),
+                round(b.y_max, 6),
+                round(b.width, 6),
+                round(b.height, 6),
+                b.is_normalized,
+            ),
+        )
+        for b in sorted_boxes:
+            conf_str = f":{b.confidence:.6f}" if b.confidence is not None else ""
+            h.update(
+                f"box:{b.class_id}:{b.x_min:.6f}:{b.y_min:.6f}:{b.x_max:.6f}:{b.y_max:.6f}:{b.width:.6f}:{b.height:.6f}:{b.is_normalized}{conf_str}\n".encode()
+            )
+
+    # 6. Unpaired labels (deterministically sorted by normalized relative path)
+    for lbl in sorted(p.replace("\\", "/") for p in manifest.unpaired_labels):
+        h.update(f"unpaired:{lbl}\n".encode())
+
+    # 7. Aggregate statistics if provided
+    if stats is not None:
+        h.update(
+            f"stats:{stats.total_images}:{stats.total_annotations}:{stats.class_imbalance_ratio:.6f}\n".encode()
         )
 
-    # Include classes
-    for cid, name in sorted(manifest.classes.items()):
-        h.update(f"{cid}:{name}".encode())
-
-    # Include aggregate stats
-    h.update(
-        f"{stats.total_images}:{stats.total_annotations}:{stats.class_imbalance_ratio}".encode()
-    )
-    return h.hexdigest()[:16]
+    return h.hexdigest()
 
 
 def parse_dataset(dataset_path: Path, config: DatasetGateConfig) -> DatasetManifest:
