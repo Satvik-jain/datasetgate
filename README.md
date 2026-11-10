@@ -101,7 +101,7 @@ Requires Python 3.11+.
 Install the release directly using `pip`:
 
 ```bash
-pip install "git+https://github.com/Satvik-jain/datasetgate.git@v0.1.1"
+pip install "git+https://github.com/Satvik-jain/datasetgate.git@v0.1.2"
 ```
 
 Or install the latest development version from `main`:
@@ -331,7 +331,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install "git+https://github.com/Satvik-jain/datasetgate.git@v0.1.1"
+      - run: pip install "git+https://github.com/Satvik-jain/datasetgate.git@v0.1.2"
       - run: datasetgate audit ./dataset --config datasetgate.yaml --output reports
       - uses: actions/upload-artifact@v4
         if: always()

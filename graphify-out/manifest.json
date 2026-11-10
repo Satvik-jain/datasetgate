@@ -12,15 +12,15 @@
     "semantic_hash": ""
   },
   "pyproject.toml": {
-    "mtime": 1794258912.149657,
-    "seen": 1794258986.9728467,
-    "ast_hash": "50b202d8fbf6b1676638fa29f4686649",
+    "mtime": 1794288580.3667297,
+    "seen": 1794300696.9892406,
+    "ast_hash": "16fbac0f9a3c1d91589e3bd7320d05ef",
     "semantic_hash": ""
   },
   "src/datasetgate/__init__.py": {
-    "mtime": 1794258916.0563984,
-    "seen": 1794258986.9728467,
-    "ast_hash": "d3e436e9d84a02098f755b22e8035935",
+    "mtime": 1794288584.4129982,
+    "seen": 1794300696.9892406,
+    "ast_hash": "d0e28a3bc60584bf8a6883d9a67c3171",
     "semantic_hash": ""
   },
   "src/datasetgate/cli/__init__.py": {
@@ -108,9 +108,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1794258954.346767,
-    "seen": 1794258986.9728467,
-    "ast_hash": "77aeca8b994d6df7005536b64e90a3c7",
+    "mtime": 1794288606.6152346,
+    "seen": 1794300696.9892406,
+    "ast_hash": "005d35ceb6656e9471721aac134b2e6b",
     "semantic_hash": ""
   },
   "src/datasetgate/parsers/__init__.py": {
@@ -216,9 +216,9 @@
     "semantic_hash": ""
   },
   "src/datasetgate/reporting/html.py": {
-    "mtime": 1794258919.660169,
-    "seen": 1794258986.9728467,
-    "ast_hash": "80a9a7fbee496b9f9e5572afd7812396",
+    "mtime": 1794288595.1281598,
+    "seen": 1794300696.9892406,
+    "ast_hash": "df29f98628a77c173daa7a2c93eea613",
     "semantic_hash": ""
   },
   "src/datasetgate/reporting/json.py": {
@@ -246,9 +246,9 @@
     "semantic_hash": ""
   },
   "examples/github-actions/datasetgate.yml": {
-    "mtime": 1794258958.6005416,
-    "seen": 1794258986.9728467,
-    "ast_hash": "39bfd83bb6586385ab8e272b09768209",
+    "mtime": 1794288619.518764,
+    "seen": 1794300696.9892406,
+    "ast_hash": "de6d0ea9d580f053516c5b6d15980cc3",
     "semantic_hash": ""
   },
   "src/datasetgate/synthetic/__init__.py": {

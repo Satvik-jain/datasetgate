@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "datasetgate"
-version = "0.1.1"
+version = "0.1.2"
 description = "Local-first computer-vision dataset validation and release-gating tool."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [
-    { name = "DatasetGate Maintainers", email = "maintainers@datasetgate.dev" }
+    { name = "Satvik Jain", email = "satvik.jain.kht@gmail.com" }
 ]
 keywords = ["computer-vision", "yolo", "coco", "mlops", "dataset-validation", "quality-gate", "ci-cd"]
 classifiers = [
@@ -32,6 +32,12 @@ dependencies = [
     "pydantic>=2.5.0",
     "jinja2>=3.1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Satvik-jain/datasetgate"
+Repository = "https://github.com/Satvik-jain/datasetgate"
+Issues = "https://github.com/Satvik-jain/datasetgate/issues"
+Documentation = "https://github.com/Satvik-jain/datasetgate#readme"
 
 [project.optional-dependencies]
 dev = [
