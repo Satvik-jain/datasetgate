@@ -1,16 +1,4 @@
 {
-  ".codex/hooks.json": {
-    "mtime": 1794255986.0081646,
-    "seen": 1794256545.3869045,
-    "ast_hash": "16c780be2de1fd6f8b914a27f11f2719",
-    "semantic_hash": ""
-  },
-  ".gemini/settings.json": {
-    "mtime": 1794256104.3356826,
-    "seen": 1794256545.3869045,
-    "ast_hash": "f4ce7ea314154d8fad380d2ce3046c1c",
-    "semantic_hash": ""
-  },
   "pyproject.toml": {
     "mtime": 1794288580.3667297,
     "seen": 1794300696.9892406,

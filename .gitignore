@@ -55,3 +55,9 @@ demo_output/
 # OS files
 .DS_Store
 Thumbs.db
+
+# AI and Agent configurations
+.agents/
+.codex/
+.gemini/
+
