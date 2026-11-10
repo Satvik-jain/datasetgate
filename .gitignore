@@ -60,4 +60,8 @@ Thumbs.db
 .agents/
 .codex/
 .gemini/
+AGENTS.md
+GEMINI.md
+graphify-out/
+
 

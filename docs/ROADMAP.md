@@ -2,20 +2,21 @@
 
 DatasetGate follows a transparent, community-driven roadmap focused on local-first engineering workflows.
 
-## v0.1.0 — Foundation (Current Release)
+## v0.1.2 — Foundation & Reliability (Current Release)
 
 - [x] Ingestion for YOLO object detection datasets (`data.yaml`, Ultralytics layout, nested splits).
-- [x] Ingestion for COCO object detection datasets (`images`, `annotations`, `categories`).
+- [x] Ingestion for COCO object detection datasets (`images`, `annotations`, `categories`) with JSON caching for fast single-pass parsing.
 - [x] Physical image integrity verification (Pillow validation, corruption detection, dimension checking).
 - [x] Annotation format and boundary checking (negative dims, NaN/Inf, out-of-bounds bounding boxes).
 - [x] Exact duplicate detection via chunked streaming SHA-256 hashes.
 - [x] Cross-split data leakage detection (train vs val vs test).
 - [x] Dataset distribution statistics and imbalance calculations.
-- [x] Configurable quality policy engine with severity overrides.
+- [x] Configurable quality policy actions (`ignore`, `warn`, `fail`) and rule severity overrides.
+- [x] Deterministic 64-character SHA-256 dataset fingerprinting incorporating image content hashes and canonicalized bounding box coordinates.
 - [x] Machine-readable `report.json` and interactive, self-contained `report.html`.
-- [x] Baseline comparison engine and regression detection.
-- [x] CLI interface with `init`, `audit`, `snapshot`, `compare`, `demo`.
-- [x] GitHub Actions workflow example.
+- [x] Baseline comparison engine and regression detection with actionable error handling for missing or malformed baselines.
+- [x] CLI interface with `init`, `audit`, `snapshot`, `compare`, `demo`, and `version`.
+- [x] GitHub Actions workflow integration and automated pipeline gating.
 
 ---
 

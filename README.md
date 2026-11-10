@@ -249,28 +249,31 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for full configuration detail
 DatasetGate outputs a clean, structured summary in the terminal:
 
 ```
-┌────────────────── DatasetGate Audit: demo (YOLO) ──────────────────┐
-│ Metric                 │ Value                                     │
-├────────────────────────┼───────────────────────────────────────────┤
-│ Total Images           │ 7                                         │
-│ Total Annotations      │ 6                                         │
-│ Dataset Splits         │ train (5), val (2)                        │
-│ Classes Count          │ 3                                         │
-│ Empty Label Rate       │ 14.3%                                     │
-│ Class Imbalance Ratio  │ 4.0:1                                     │
-│ Duplicate Image Groups │ 0                                         │
-│ Cross-Split Leakages   │ 1                                         │
-│ Fingerprint            │ 8f2b3e41a9c18d05                          │
-└────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────── DatasetGate Audit: demo (YOLO) ──────────────────────────────┐
+│ Metric                 │ Value                                                            │
+├────────────────────────┼──────────────────────────────────────────────────────────────────┤
+│ Total Images           │ 8                                                                │
+│ Total Annotations      │ 8                                                                │
+│ Dataset Splits         │ train (6), val (2)                                               │
+│ Classes Count          │ 2                                                                │
+│ Empty Label Rate       │ 12.5%                                                            │
+│ Class Imbalance Ratio  │ 1.7:1                                                            │
+│ Duplicate Image Groups │ 0                                                                │
+│ Cross-Split Leakages   │ 1                                                                │
+│ Fingerprint            │ 2d92ffe4660915b19938fc259472081058eaaa83a01b184c9dbcbff6ff182564 │
+└────────────────────────┴──────────────────────────────────────────────────────────────────┘
 
-Errors (2):
-  • SPLIT_LEAKAGE: Exact duplicate image leaked across splits (train, val).
-  • BBOX_OUT_OF_BOUNDS: Bounding box [0.750, 0.350, 1.150, 0.650] extends outside normalized image bounds.
+Errors (5):
+  • BBOX_OUT_OF_BOUNDS: Bounding box [0.750, 0.350, 1.150, 0.650] extends outside normalized image bounds at labels/train/train_oob.txt:1.
+  • CORRUPTED_IMAGE: Corrupted or unreadable image file 'images/train/train_corrupted.jpg'.
+  • SPLIT_LEAKAGE: Exact duplicate image leaked across splits (train, val). Found in split 'train', duplicates: images/val/val_leaked.jpg.
+  • SPLIT_LEAKAGE: Exact duplicate image leaked across splits (train, val). Found in split 'val', duplicates: images/train/train_leaked.jpg.
+  • MISSING_CLASS_IN_TRAIN: Train split is missing annotations for 1 declared class(es): traffic_sign.
 
-╭─────────────────────── QUALITY GATE FAILED ────────────────────────╮
-│ Violations detected against configured policy.                     │
-│ Inspect reports: reports/report.json and reports/report.html       │
-╰────────────────────────────────────────────────────────────────────╯
+╭─────────────────────────────────── QUALITY GATE FAILED ───────────────────────────────────╮
+│ Violations detected against configured policy.                                            │
+│ Inspect reports: reports/report.json and reports/report.html                              │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ### Self-Contained HTML Report
