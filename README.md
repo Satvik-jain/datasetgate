@@ -249,7 +249,14 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for full configuration detail
 DatasetGate outputs a clean, structured summary in the terminal:
 
 ```
-┌───────────────────────────── DatasetGate Audit: demo (YOLO) ──────────────────────────────┐
+$ datasetgate demo
+Created synthetic YOLO demo dataset at: demo_dataset
+
+Running demonstration audit...
+
+DatasetGate Audit: Scanning demo_dataset...
+                    DatasetGate Audit: demo_dataset (YOLO)                     
+┌────────────────────────┬──────────────────────────────────────────────────────────────────┐
 │ Metric                 │ Value                                                            │
 ├────────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ Total Images           │ 8                                                                │
@@ -265,15 +272,16 @@ DatasetGate outputs a clean, structured summary in the terminal:
 
 Errors (5):
   • BBOX_OUT_OF_BOUNDS: Bounding box [0.750, 0.350, 1.150, 0.650] extends outside normalized image bounds at labels/train/train_oob.txt:1.
-  • CORRUPTED_IMAGE: Corrupted or unreadable image file 'images/train/train_corrupted.jpg'.
+  • CORRUPTED_IMAGE: Corrupted or unreadable image file 'images/train/train_corrupted.jpg': cannot identify image file 'demo_dataset/images/train/train_corrupted.jpg'.
   • SPLIT_LEAKAGE: Exact duplicate image leaked across splits (train, val). Found in split 'train', duplicates: images/val/val_leaked.jpg.
   • SPLIT_LEAKAGE: Exact duplicate image leaked across splits (train, val). Found in split 'val', duplicates: images/train/train_leaked.jpg.
   • MISSING_CLASS_IN_TRAIN: Train split is missing annotations for 1 declared class(es): traffic_sign.
 
-╭─────────────────────────────────── QUALITY GATE FAILED ───────────────────────────────────╮
+┌───────────────────────────────────────────────────────────────────────────────────────────┐
+│ QUALITY GATE FAILED                                                                       │
 │ Violations detected against configured policy.                                            │
-│ Inspect reports: reports/report.json and reports/report.html                              │
-╰───────────────────────────────────────────────────────────────────────────────────────────╯
+│ Inspect reports: demo_dataset/reports/report.json and demo_dataset/reports/report.html    │
+└───────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Self-Contained HTML Report
