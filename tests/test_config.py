@@ -104,3 +104,70 @@ policy:
     )
     with pytest.raises(ConfigError, match="at least one severity"):
         load_config(invalid_file)
+
+
+def test_perceptual_hash_config_defaults():
+    cfg = DatasetGateConfig()
+    phash_cfg = cfg.policy.perceptual_hash
+    assert phash_cfg.enabled is False
+    assert phash_cfg.max_hamming_distance == 6
+    assert phash_cfg.duplicate_policy == PolicyAction.WARN
+    assert phash_cfg.split_leakage_policy == PolicyAction.WARN
+    assert phash_cfg.max_candidate_pairs == 10000
+    assert phash_cfg.truncation_action == PolicyAction.FAIL
+
+
+def test_perceptual_hash_config_from_yaml(tmp_path: Path):
+    cfg_file = tmp_path / "phash_enabled.yaml"
+    cfg_file.write_text(
+        """
+version: 1
+policy:
+  perceptual_hash:
+    enabled: true
+    max_hamming_distance: 8
+    duplicate_policy: fail
+    split_leakage_policy: fail
+    max_candidate_pairs: 5000
+    truncation_action: warn
+""",
+        encoding="utf-8",
+    )
+    cfg = load_config(cfg_file)
+    phash_cfg = cfg.policy.perceptual_hash
+    assert phash_cfg.enabled is True
+    assert phash_cfg.max_hamming_distance == 8
+    assert phash_cfg.duplicate_policy == PolicyAction.FAIL
+    assert phash_cfg.split_leakage_policy == PolicyAction.FAIL
+    assert phash_cfg.max_candidate_pairs == 5000
+    assert phash_cfg.truncation_action == PolicyAction.WARN
+
+
+@pytest.mark.parametrize(
+    "invalid_yaml,err_match",
+    [
+        (
+            "policy:\n  perceptual_hash:\n    max_hamming_distance: 64",
+            "validation error",
+        ),
+        (
+            "policy:\n  perceptual_hash:\n    max_hamming_distance: -1",
+            "validation error",
+        ),
+        (
+            "policy:\n  perceptual_hash:\n    max_candidate_pairs: 0",
+            "validation error",
+        ),
+        (
+            "policy:\n  perceptual_hash:\n    truncation_action: ignore",
+            "validation error",
+        ),
+    ],
+)
+def test_perceptual_hash_config_validation_errors(
+    tmp_path: Path, invalid_yaml: str, err_match: str
+):
+    bad_file = tmp_path / "bad_phash.yaml"
+    bad_file.write_text(f"version: 1\n{invalid_yaml}", encoding="utf-8")
+    with pytest.raises(ConfigError, match=err_match):
+        load_config(bad_file)
