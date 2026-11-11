@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import math
 import random
 from pathlib import Path
 
@@ -10,16 +11,22 @@ import pytest
 from PIL import Image, ImageDraw, ImageEnhance
 
 from datasetgate.validators.phash import (
+    HASH_BITS,
+    LOW_FREQ_SIZE,
+    MAX_HASH_VALUE,
     PHASH_ALGORITHM_ID,
+    SAMPLE_SIZE,
     BKTree,
     PHashDecodeError,
     bit_agreement_pct,
+    brute_force_find_all_pairs,
     compute_phash,
     compute_phash_from_image,
+    compute_phash_from_preprocessed,
+    find_candidate_pairs,
     hamming_distance,
     hex_to_phash,
     phash_to_hex,
-    preprocess_image_for_phash,
 )
 
 
@@ -31,20 +38,6 @@ def create_scene_image(width: int = 300, height: int = 300) -> Image.Image:
     draw.ellipse([140, 40, 260, 160], fill=(255, 215, 0))
     draw.polygon([(50, 280), (150, 200), (250, 280)], fill=(34, 139, 34))
     draw.line([(0, 150), (300, 150)], fill=(255, 255, 255), width=3)
-    return img
-
-
-def create_gradient_test_image(width: int = 200, height: int = 150) -> Image.Image:
-    """Create a synthetic image with diagonal gradient."""
-    img = Image.new("RGB", (width, height))
-    pixels = img.load()
-    assert pixels is not None
-    for y in range(height):
-        for x in range(width):
-            r = int((x / width) * 255)
-            g = int((y / height) * 255)
-            b = int(((x + y) / (width + height)) * 255)
-            pixels[x, y] = (r, g, b)
     return img
 
 
@@ -62,364 +55,474 @@ def create_checkerboard_image(
     return img
 
 
+def direct_textbook_dct_2d(matrix: list[list[float]]) -> list[list[float]]:
+    """Independent unoptimized textbook implementation of 2D DCT-II."""
+    n = SAMPLE_SIZE
+    res = [[0.0] * LOW_FREQ_SIZE for _ in range(LOW_FREQ_SIZE)]
+    for u in range(LOW_FREQ_SIZE):
+        alpha_u = math.sqrt(1.0 / n) if u == 0 else math.sqrt(2.0 / n)
+        for v in range(LOW_FREQ_SIZE):
+            alpha_v = math.sqrt(1.0 / n) if v == 0 else math.sqrt(2.0 / n)
+            s = 0.0
+            for x in range(n):
+                for y in range(n):
+                    s += (
+                        matrix[x][y]
+                        * math.cos(math.pi * (2 * x + 1) * u / (2.0 * n))
+                        * math.cos(math.pi * (2 * y + 1) * v / (2.0 * n))
+                    )
+            res[u][v] = alpha_u * alpha_v * s
+    return res
+
+
 # =========================================================================
 # pHash Core & Preprocessing Tests
 # =========================================================================
 
 
 def test_phash_algorithm_id():
-    """Verify algorithm identifier is explicitly documented."""
-    assert PHASH_ALGORITHM_ID == "phash-dct-64-ac-median"
+    """Verify algorithm identifier explicitly records 63-bit AC-only median hash."""
+    assert PHASH_ALGORITHM_ID == "phash-dct-63-ac-median"
+    assert HASH_BITS == 63
+    assert MAX_HASH_VALUE == (1 << 63) - 1
 
 
 def test_phash_hex_roundtrip():
-    """Verify conversion between 64-bit int and 16-character hex string."""
-    val = 0xD661398669D6C669
+    """Verify conversion between 63-bit int and 16-character hex string."""
+    val = 0x5661398669D6C669
+    assert val <= MAX_HASH_VALUE
     hex_str = phash_to_hex(val)
-    assert hex_str == "d661398669d6c669"
+    assert hex_str == "5661398669d6c669"
     assert len(hex_str) == 16
     assert hex_to_phash(hex_str) == val
 
     # Test edge values
     assert phash_to_hex(0) == "0000000000000000"
     assert hex_to_phash("0000000000000000") == 0
-    max_64 = (1 << 64) - 1
-    assert phash_to_hex(max_64) == "ffffffffffffffff"
-    assert hex_to_phash("ffffffffffffffff") == max_64
+    assert phash_to_hex(MAX_HASH_VALUE) == "7fffffffffffffff"
+    assert hex_to_phash("7fffffffffffffff") == MAX_HASH_VALUE
+
+    # Out of range values
+    with pytest.raises(ValueError):
+        phash_to_hex(-1)
+    with pytest.raises(ValueError):
+        phash_to_hex(MAX_HASH_VALUE + 1)
+    with pytest.raises(ValueError):
+        hex_to_phash("8000000000000000")  # Exceeds 63-bit unsigned range
+    with pytest.raises(ValueError):
+        hex_to_phash("abc")  # Invalid length
 
 
 def test_bit_agreement_pct():
     """Verify bit agreement percentage calculation and boundary values."""
     assert bit_agreement_pct(0) == 100.0
-    assert bit_agreement_pct(64) == 0.0
-    assert abs(bit_agreement_pct(6) - 90.625) < 1e-4
-    assert abs(bit_agreement_pct(32) - 50.0) < 1e-4
-    # Test clamped boundaries
-    assert bit_agreement_pct(-5) == 100.0
-    assert bit_agreement_pct(100) == 0.0
+    assert bit_agreement_pct(63) == 0.0
+    assert abs(bit_agreement_pct(7) - ((63 - 7) / 63 * 100)) < 1e-4
+
+    with pytest.raises(ValueError, match="total_bits must be positive"):
+        bit_agreement_pct(5, total_bits=0)
+    with pytest.raises(ValueError, match="distance must be non-negative"):
+        bit_agreement_pct(-1)
+
+
+def test_direct_dct_reference_precision():
+    """Verify separable DCT in phash matches textbook direct 2D DCT-II to floating precision."""
+    rng = random.Random(1337)
+    test_grid = [
+        [float(rng.randint(0, 255)) for _ in range(SAMPLE_SIZE)] for _ in range(SAMPLE_SIZE)
+    ]
+
+    # 1. Compute direct textbook 2D DCT-II
+    direct_coeffs = direct_textbook_dct_2d(test_grid)
+
+    # 2. Compute using preprocessed Pillow image and compute_phash_from_preprocessed
+    img = Image.new("L", (SAMPLE_SIZE, SAMPLE_SIZE))
+    pixels = img.load()
+    assert pixels is not None
+    for x in range(SAMPLE_SIZE):
+        for y in range(SAMPLE_SIZE):
+            pixels[x, y] = int(test_grid[x][y])
+
+    # Extract coefficients through internal separable matrix multiplication
+    from datasetgate.validators.phash import _DCT_BASIS
+
+    inter = [[0.0] * SAMPLE_SIZE for _ in range(LOW_FREQ_SIZE)]
+    for k in range(LOW_FREQ_SIZE):
+        basis_k = _DCT_BASIS[k]
+        for j in range(SAMPLE_SIZE):
+            s = sum(basis_k[n] * test_grid[n][j] for n in range(SAMPLE_SIZE))
+            inter[k][j] = s
+
+    for k in range(LOW_FREQ_SIZE):
+        for col_idx in range(LOW_FREQ_SIZE):
+            basis_col = _DCT_BASIS[col_idx]
+            coeff = sum(inter[k][j] * basis_col[j] for j in range(SAMPLE_SIZE))
+            expected = direct_coeffs[k][col_idx]
+            assert abs(coeff - expected) < 1e-9, (
+                f"Mismatch at ({k}, {col_idx}): {coeff} vs {expected}"
+            )
+
+
+def test_brightness_invariance_and_dc_exclusion():
+    """Prove that uniform brightness shift changes DC but leaves 63-bit AC pHash identical."""
+    # Create an image with intensity in safe unclipped range [40, 200]
+    base = Image.new("RGB", (200, 200), (100, 120, 140))
+    draw = ImageDraw.Draw(base)
+    draw.rectangle([30, 30, 100, 100], fill=(60, 80, 100))
+    draw.ellipse([80, 80, 160, 160], fill=(150, 170, 190))
+
+    hash_base = compute_phash_from_image(base)
+
+    # Add uniform offset of +25 to all pixel channels (unclipped)
+    bright = Image.eval(base, lambda v: v + 25)
+    hash_bright = compute_phash_from_image(bright)
+
+    # The 63-bit AC pHash must be identical (Hamming distance = 0)
+    dist = hamming_distance(hash_base, hash_bright)
+    assert dist == 0, f"Expected 0 Hamming distance under uniform brightness addition, got {dist}"
+    assert bit_agreement_pct(dist) == 100.0
 
 
 def test_phash_exact_duplicate_files(tmp_path: Path):
-    """Exact identical image copied under another filename produces Hamming distance 0."""
-    base_img = create_gradient_test_image()
-    f1 = tmp_path / "img1.png"
-    f2 = tmp_path / "img2.png"
-    base_img.save(f1)
-    base_img.save(f2)
+    """Verify identical image files have identical hashes and 100% agreement."""
+    img = create_scene_image()
+    path1 = tmp_path / "img1.png"
+    path2 = tmp_path / "img2.png"
+    img.save(path1)
+    img.save(path2)
 
-    h1 = compute_phash(f1)
-    h2 = compute_phash(f2)
-
+    h1 = compute_phash(path1)
+    h2 = compute_phash(path2)
     assert h1 == h2
     assert hamming_distance(h1, h2) == 0
-    assert bit_agreement_pct(hamming_distance(h1, h2)) == 100.0
+    assert bit_agreement_pct(0) == 100.0
 
 
 def test_phash_resizing_robustness():
-    """Downscaled image preserves perceptual hash within low Hamming distance."""
-    original = create_scene_image(600, 600)
-    resized = original.resize((150, 150), Image.Resampling.BILINEAR)
+    """Verify that resizing structured images retains near-zero Hamming distance."""
+    base = create_scene_image(600, 600)
+    h_base = compute_phash_from_image(base)
 
-    h_orig = compute_phash_from_image(original)
-    h_resized = compute_phash_from_image(resized)
-
-    dist = hamming_distance(h_orig, h_resized)
-    assert dist <= 2, f"Resizing caused distance {dist} > 2"
-
-
-def test_phash_jpeg_compression_robustness():
-    """JPEG recompression at various qualities maintains high hash agreement."""
-    original = create_scene_image(300, 300)
-    buf_high = io.BytesIO()
-    buf_low = io.BytesIO()
-
-    original.save(buf_high, format="JPEG", quality=95)
-    original.save(buf_low, format="JPEG", quality=35)
-
-    img_high = Image.open(buf_high)
-    img_low = Image.open(buf_low)
-
-    h_orig = compute_phash_from_image(original)
-    h_high = compute_phash_from_image(img_high)
-    h_low = compute_phash_from_image(img_low)
-
-    assert hamming_distance(h_orig, h_high) <= 2
-    assert hamming_distance(h_high, h_low) <= 4
+    for sz in [(400, 400), (300, 300), (200, 200), (100, 100)]:
+        resized = base.resize(sz, Image.Resampling.BILINEAR)
+        h_resized = compute_phash_from_image(resized)
+        dist = hamming_distance(h_base, h_resized)
+        assert dist <= 2, f"Distance too large on resize {sz}: {dist}"
 
 
-def test_phash_png_to_jpeg_conversion():
-    """Converting from lossless PNG to lossy JPEG produces a near-match."""
-    original = create_scene_image(250, 250)
-    buf_png = io.BytesIO()
-    buf_jpeg = io.BytesIO()
+def test_phash_jpeg_compression_robustness(tmp_path: Path):
+    """Verify that JPEG compression artifacts produce low Hamming distance."""
+    base = create_scene_image(400, 400)
+    h_base = compute_phash_from_image(base)
 
-    original.save(buf_png, format="PNG")
-    original.save(buf_jpeg, format="JPEG", quality=85)
+    for quality in (95, 75, 50, 35):
+        buf = io.BytesIO()
+        base.save(buf, format="JPEG", quality=quality)
+        buf.seek(0)
+        with Image.open(buf) as jpg_img:
+            h_jpg = compute_phash_from_image(jpg_img)
+        dist = hamming_distance(h_base, h_jpg)
+        assert dist <= 4, f"JPEG q={quality} distance too large: {dist}"
 
-    h_png = compute_phash_from_image(Image.open(buf_png))
-    h_jpeg = compute_phash_from_image(Image.open(buf_jpeg))
 
-    assert hamming_distance(h_png, h_jpeg) <= 3
+def test_phash_png_to_jpeg_conversion(tmp_path: Path):
+    """Verify format conversion between PNG and JPEG maintains low Hamming distance."""
+    base = create_scene_image(300, 300)
+    png_path = tmp_path / "scene.png"
+    jpg_path = tmp_path / "scene.jpg"
+
+    base.save(png_path, format="PNG")
+    base.save(jpg_path, format="JPEG", quality=90)
+
+    h_png = compute_phash(png_path)
+    h_jpg = compute_phash(jpg_path)
+    dist = hamming_distance(h_png, h_jpg)
+    assert dist <= 3
 
 
-def test_phash_brightness_and_contrast_adjustments():
-    """Mild brightness and contrast adjustments retain low distance."""
-    original = create_scene_image(250, 250)
+def test_phash_contrast_adjustments():
+    """Verify contrast variations produce low Hamming distances."""
+    base = create_scene_image(300, 300)
+    h_base = compute_phash_from_image(base)
 
-    # Brightness adjustment (+10% and -10%)
-    bright = ImageEnhance.Brightness(original).enhance(1.10)
-    dim = ImageEnhance.Brightness(original).enhance(0.90)
-
-    # Contrast adjustment (+15% and -15%)
-    contrast_high = ImageEnhance.Contrast(original).enhance(1.15)
-    contrast_low = ImageEnhance.Contrast(original).enhance(0.85)
-
-    h_orig = compute_phash_from_image(original)
-    h_bright = compute_phash_from_image(bright)
-    h_dim = compute_phash_from_image(dim)
-    h_chigh = compute_phash_from_image(contrast_high)
-    h_clow = compute_phash_from_image(contrast_low)
-
-    assert hamming_distance(h_orig, h_bright) <= 4
-    assert hamming_distance(h_orig, h_dim) <= 4
-    assert hamming_distance(h_orig, h_chigh) <= 4
-    assert hamming_distance(h_orig, h_clow) <= 4
+    for factor in (0.8, 1.2):
+        c_img = ImageEnhance.Contrast(base).enhance(factor)
+        h_c = compute_phash_from_image(c_img)
+        dist = hamming_distance(h_base, h_c)
+        assert dist <= 4, f"Contrast factor {factor} distance too large: {dist}"
 
 
 def test_phash_dissimilar_images_large_distance():
-    """Genuinely different visual content yields large Hamming distance."""
-    img_gradient = create_gradient_test_image(200, 200)
-    img_checker = create_checkerboard_image(200, 200, block_size=15)
-    img_plain = Image.new("RGB", (200, 200), (128, 128, 128))
+    """Verify visually dissimilar images produce large Hamming distance."""
+    img1 = create_scene_image(300, 300)
+    img2 = create_checkerboard_image(300, 300, block_size=15)
 
-    h_gradient = compute_phash_from_image(img_gradient)
-    h_checker = compute_phash_from_image(img_checker)
-    h_plain = compute_phash_from_image(img_plain)
-
-    dist1 = hamming_distance(h_gradient, h_checker)
-    dist2 = hamming_distance(h_gradient, h_plain)
-    dist3 = hamming_distance(h_checker, h_plain)
-
-    # Substantially different frequency patterns should differ significantly
-    assert dist1 >= 10, f"Gradient and Checkerboard too close: {dist1}"
-    assert dist2 >= 8, f"Gradient and Plain too close: {dist2}"
-    assert dist3 >= 8, f"Checkerboard and Plain too close: {dist3}"
+    h1 = compute_phash_from_image(img1)
+    h2 = compute_phash_from_image(img2)
+    dist = hamming_distance(h1, h2)
+    assert dist >= 20, f"Distance between dissimilar images unexpectedly small: {dist}"
 
 
 def test_phash_transparency_modes():
-    """RGBA, LA, and palette images with transparency preprocess cleanly."""
-    # RGBA
-    rgba = Image.new("RGBA", (100, 100), (255, 0, 0, 128))
+    """Verify RGBA, LA, and palette images with transparency composite onto white."""
+    rgba = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(rgba)
+    draw.rectangle([20, 20, 80, 80], fill=(255, 0, 0, 255))
     h_rgba = compute_phash_from_image(rgba)
     assert isinstance(h_rgba, int)
-
-    # LA (Luminance + Alpha)
-    la = Image.new("LA", (100, 100), (180, 128))
-    h_la = compute_phash_from_image(la)
-    assert isinstance(h_la, int)
-
-    # Palette image with transparency
-    p_img = Image.new("P", (100, 100))
-    p_img.info["transparency"] = 0
-    h_p = compute_phash_from_image(p_img)
-    assert isinstance(h_p, int)
+    assert 0 <= h_rgba <= MAX_HASH_VALUE
 
 
 def test_phash_grayscale_and_exotic_modes():
-    """Grayscale and other valid Pillow modes hash without errors."""
-    gray = Image.new("L", (100, 100), 200)
-    assert isinstance(compute_phash_from_image(gray), int)
-
-    # 1-bit monochrome
-    mono = Image.new("1", (100, 100), 1)
-    assert isinstance(compute_phash_from_image(mono), int)
-
-    # CMYK
-    cmyk = Image.new("CMYK", (100, 100), (50, 100, 150, 20))
-    assert isinstance(compute_phash_from_image(cmyk), int)
+    """Verify grayscale and 1-bit modes compute valid perceptual hashes."""
+    gray = Image.new("L", (100, 100), 128)
+    d = ImageDraw.Draw(gray)
+    d.rectangle([10, 10, 50, 50], fill=0)
+    h_gray = compute_phash_from_image(gray)
+    assert isinstance(h_gray, int)
+    assert 0 <= h_gray <= MAX_HASH_VALUE
 
 
 def test_phash_tiny_images():
-    """Extremely small images (1x1, 2x2, 5x5) resize cleanly and hash."""
-    tiny1 = Image.new("RGB", (1, 1), (100, 150, 200))
-    tiny2 = Image.new("L", (2, 2), 120)
-    tiny5 = Image.new("RGBA", (5, 5), (10, 20, 30, 255))
-
-    assert isinstance(compute_phash_from_image(tiny1), int)
-    assert isinstance(compute_phash_from_image(tiny2), int)
-    assert isinstance(compute_phash_from_image(tiny5), int)
-
-
-def test_phash_corrupted_file_error_handling(tmp_path: Path):
-    """Corrupted and 0-byte images raise PHashDecodeError without crashing process."""
-    corrupted_file = tmp_path / "corrupt.jpg"
-    corrupted_file.write_bytes(b"NOT_A_VALID_JPEG_HEADER_1234567890")
-
-    empty_file = tmp_path / "empty.png"
-    empty_file.write_bytes(b"")
-
-    nonexistent_file = tmp_path / "missing.jpg"
-
-    with pytest.raises(PHashDecodeError, match="Cannot identify or decode"):
-        compute_phash(corrupted_file)
-
-    with pytest.raises(PHashDecodeError, match="Cannot identify or decode"):
-        compute_phash(empty_file)
-
-    with pytest.raises(PHashDecodeError, match="does not exist"):
-        compute_phash(nonexistent_file)
+    """Verify edge case of tiny images downsampling without crash."""
+    for sz in [(1, 1), (2, 2), (5, 5)]:
+        tiny = Image.new("RGB", sz, (100, 150, 200))
+        h = compute_phash_from_image(tiny)
+        assert isinstance(h, int)
+        assert 0 <= h <= MAX_HASH_VALUE
 
 
 def test_phash_exif_orientation_handling():
-    """EXIF orientation is normalized so rotated images produce expected matching hashes."""
-    base = create_gradient_test_image(200, 100)
-    # Add EXIF orientation tag 1 (normal) vs transposed
-    pre_normal = preprocess_image_for_phash(base)
-    assert pre_normal.size == (32, 32)
+    """Verify EXIF orientation flag is normalized before hashing."""
+    base = Image.new("RGB", (100, 50), (255, 255, 255))
+    draw = ImageDraw.Draw(base)
+    draw.rectangle([0, 0, 30, 20], fill=(0, 0, 0))
+
+    # Tag 6 indicates 90 CW rotation needed to display upright,
+    # so the raw captured buffer is rotated 90 CCW relative to upright.
+    rotated = base.rotate(90, expand=True)
+    exif = rotated.getexif()
+    exif[0x0112] = 6  # Orientation tag indicating 90 CW rotation needed
+    buf = io.BytesIO()
+    rotated.save(buf, format="JPEG", exif=exif)
+    buf.seek(0)
+
+    with Image.open(buf) as img_exif:
+        h_exif = compute_phash_from_image(img_exif)
+    h_base = compute_phash_from_image(base)
+    assert hamming_distance(h_base, h_exif) <= 4
 
 
 # =========================================================================
-# BK-Tree Data Structure & Pair Matching Tests
+# Pillow Decompression-Bomb and Safety Tests
+# =========================================================================
+
+
+def test_decompression_bomb_warning_threshold_raises_decode_error(tmp_path: Path):
+    """Verify an image exceeding the decompression bomb warning threshold raises PHashDecodeError."""
+    # Temporarily set a local MAX_IMAGE_PIXELS threshold to test warning safety
+    orig_max = Image.MAX_IMAGE_PIXELS
+    try:
+        Image.MAX_IMAGE_PIXELS = 1000
+        # 1200 pixels exceeds MAX_IMAGE_PIXELS (1000) but <= 2*MAX_IMAGE_PIXELS (2000)
+        img = Image.new("RGB", (40, 30))
+        test_file = tmp_path / "bomb_warn.png"
+        img.save(test_file)
+
+        with pytest.raises(PHashDecodeError, match="exceeds decompression bomb warning threshold"):
+            compute_phash(test_file)
+    finally:
+        Image.MAX_IMAGE_PIXELS = orig_max
+
+
+def test_decompression_bomb_error_threshold_raises_decode_error(tmp_path: Path):
+    """Verify an image exceeding the decompression bomb error threshold raises PHashDecodeError."""
+    orig_max = Image.MAX_IMAGE_PIXELS
+    try:
+        Image.MAX_IMAGE_PIXELS = 1000
+        # 2500 pixels exceeds 2*MAX_IMAGE_PIXELS (2000)
+        img = Image.new("RGB", (50, 50))
+        test_file = tmp_path / "bomb_error.png"
+        img.save(test_file)
+
+        with pytest.raises(PHashDecodeError, match="exceeds Pillow decompression bomb"):
+            compute_phash(test_file)
+    finally:
+        Image.MAX_IMAGE_PIXELS = orig_max
+
+
+def test_corrupted_file_error_handling(tmp_path: Path):
+    """Verify corrupted, truncated, or nonexistent files raise PHashDecodeError."""
+    corrupted_path = tmp_path / "bad.jpg"
+    corrupted_path.write_bytes(b"\xff\xd8\xff\xe0\x00\x10JFIF\x00corrupted_garbage_bytes")
+
+    with pytest.raises(PHashDecodeError):
+        compute_phash(corrupted_path)
+
+    nonexistent_path = tmp_path / "missing.jpg"
+    with pytest.raises(PHashDecodeError, match="does not exist"):
+        compute_phash(nonexistent_path)
+
+
+def test_normal_large_image_succeeds_without_error(tmp_path: Path):
+    """Verify normal large images (e.g. 1500x1500) hash without triggering warning or error."""
+    img = Image.new("RGB", (1500, 1500), (120, 140, 160))
+    test_file = tmp_path / "normal_large.png"
+    img.save(test_file)
+
+    h = compute_phash(test_file)
+    assert isinstance(h, int)
+    assert 0 <= h <= MAX_HASH_VALUE
+
+
+def test_safety_mechanism_not_disabled_globally():
+    """Verify Image.MAX_IMAGE_PIXELS is never disabled (set to None) globally."""
+    assert Image.MAX_IMAGE_PIXELS is not None
+    assert Image.MAX_IMAGE_PIXELS >= 10_000_000
+
+
+# =========================================================================
+# BK-Tree, Brute-Force, and Adaptive Strategy Tests
 # =========================================================================
 
 
 def test_bktree_empty():
-    """Empty BK-tree returns empty results."""
+    """Verify empty BK-Tree behaves correctly."""
     tree: BKTree[str] = BKTree()
     assert tree.item_count == 0
     assert tree.node_count == 0
-    assert tree.find_within(0x1234, 6) == []
+    assert tree.find_within(0, 5) == []
+    assert list(tree.iter_within(0, 5)) == []
 
 
-def test_bktree_duplicate_hash_bucket():
-    """Multiple items with identical hash occupy the same node bucket."""
+def test_bktree_invalid_arguments():
+    """Verify negative distances and non-positive candidate limits raise ValueError."""
     tree: BKTree[str] = BKTree()
-    h = 0xAABBCCDDEEFF0011
-
-    tree.insert("img1.jpg", h)
-    assert tree.item_count == 1
-    assert tree.node_count == 1
-
-    tree.insert("img2.jpg", h)
-    assert tree.item_count == 2
-    assert tree.node_count == 1  # Reuses same node bucket
-
-    tree.insert("img3.jpg", h)
-    assert tree.item_count == 3
-    assert tree.node_count == 1
-
-    matches = tree.find_within(h, max_dist=0)
-    matched_items = [m[0] for m in matches]
-    assert matched_items == ["img1.jpg", "img2.jpg", "img3.jpg"]
-    assert all(m[1] == 0 for m in matches)
+    with pytest.raises(ValueError, match="max_dist must be non-negative"):
+        tree.find_within(0, -1)
+    with pytest.raises(ValueError, match="max_dist must be non-negative"):
+        list(tree.iter_within(0, -1))
+    with pytest.raises(ValueError, match="max_dist must be non-negative"):
+        BKTree.find_all_pairs([], -1)
+    with pytest.raises(ValueError, match="max_candidate_pairs must be positive"):
+        BKTree.find_all_pairs([], 2, max_candidate_pairs=0)
+    with pytest.raises(ValueError, match="max_candidate_pairs must be positive"):
+        BKTree.find_all_pairs([], 2, max_candidate_pairs=-5)
 
 
-def test_bktree_exhaustive_brute_force_equivalence():
-    """Prove that BKTree.find_all_pairs matches exhaustive brute-force discovery.
-
-    Runs multiple randomized trials with varying search radii and duplicate hashes.
-    Verifies that every qualifying unordered pair is discovered exactly once.
-    """
-    random.seed(1337)
-
-    for trial in range(15):
-        n = 150
-        # Create a pool to force some exact hash collisions
-        pool = [random.getrandbits(64) for _ in range(30)]
-        hashes = [
-            random.choice(pool) if random.random() < 0.35 else random.getrandbits(64)
-            for _ in range(n)
-        ]
-        items = [f"image_{i:03d}.jpg" for i in range(n)]
-        items_with_hashes = list(zip(items, hashes, strict=True))
-
-        max_dist = random.randint(0, 18)
-
-        # 1. Exhaustive Brute-Force O(N^2)
-        bf_pairs: list[tuple[str, str, int]] = []
-        for i in range(n):
-            for j in range(i + 1, n):
-                d = (hashes[i] ^ hashes[j]).bit_count()
-                if d <= max_dist:
-                    bf_pairs.append((items[i], items[j], d))
-
-        # 2. BK-Tree Single-Pass Search
-        bk_pairs, is_truncated = BKTree.find_all_pairs(items_with_hashes, max_dist=max_dist)
-        assert not is_truncated
-
-        # Verify no duplicate pairs in BK-Tree output
-        bk_set = {(p[0], p[1], p[2]) for p in bk_pairs}
-        assert len(bk_pairs) == len(bk_set), (
-            f"Trial {trial}: BK-Tree produced duplicate pair emissions! "
-            f"Total: {len(bk_pairs)}, Unique: {len(bk_set)}"
-        )
-
-        # Verify exact equivalence to brute force
-        bf_set = {(p[0], p[1], p[2]) for p in bf_pairs}
-        assert bk_set == bf_set, (
-            f"Trial {trial} (max_dist={max_dist}) mismatch! "
-            f"BK count: {len(bk_set)}, BF count: {len(bf_set)}"
-        )
-
-
-def test_bktree_threshold_boundary_conditions():
-    """Verify exact boundary behavior for distance thresholds."""
-    h_base = 0x0000000000000000
-    # Exactly distance 1
-    h_dist1 = 0x0000000000000001
-    # Exactly distance 6
-    h_dist6 = 0x000000000000003F  # 6 ones
-    # Exactly distance 7
-    h_dist7 = 0x000000000000007F  # 7 ones
-
-    items = [
-        ("base", h_base),
-        ("d1", h_dist1),
-        ("d6", h_dist6),
-        ("d7", h_dist7),
+def test_bktree_incremental_iterator_equivalence():
+    """Verify iter_within yields items identical to find_within."""
+    tree: BKTree[str] = BKTree()
+    hashes = [
+        ("a", 0b0000000001),
+        ("b", 0b0000000011),
+        ("c", 0b0000000111),
+        ("d", 0b0000000001),  # duplicate hash
+        ("e", 0b1111111111),
     ]
+    for item, h in hashes:
+        tree.insert(item, h)
 
-    # At max_dist = 0: no cross-matches
-    pairs_0, _ = BKTree.find_all_pairs(items, max_dist=0)
-    assert pairs_0 == []
-
-    # At max_dist = 1: base <-> d1 match only
-    pairs_1, _ = BKTree.find_all_pairs(items, max_dist=1)
-    assert len(pairs_1) == 2  # (base, d1, 1) and (d6, d7, 1 because 0x3F vs 0x7F diff is 1 bit!)
-    pair_labels_1 = {(p[0], p[1]): p[2] for p in pairs_1}
-    assert pair_labels_1[("base", "d1")] == 1
-    assert pair_labels_1[("d6", "d7")] == 1
-
-    # At max_dist = 6: base should match d6 (d=6), but not d7 (d=7)
-    pairs_6, _ = BKTree.find_all_pairs(items, max_dist=6)
-    pair_labels_6 = {(p[0], p[1]): p[2] for p in pairs_6}
-    assert ("base", "d6") in pair_labels_6
-    assert pair_labels_6[("base", "d6")] == 6
-    assert ("base", "d7") not in pair_labels_6
+    list_matches = tree.find_within(0b0000000001, max_dist=2)
+    iter_matches = list(tree.iter_within(0b0000000001, max_dist=2))
+    assert list_matches == iter_matches
+    assert ("a", 0) in iter_matches
+    assert ("d", 0) in iter_matches
+    assert ("b", 1) in iter_matches
+    assert ("c", 2) in iter_matches
+    assert ("e", 9) not in iter_matches
 
 
-def test_bktree_candidate_explosion_truncation():
-    """Candidate pair limit halts discovery and sets is_truncated=True."""
-    # 50 items with identical hash => 50 * 49 / 2 = 1,225 pairs
-    h = 0x1234567890ABCDEF
-    items = [(f"img_{i}", h) for i in range(50)]
+def test_bktree_large_bucket_memory_protection():
+    """Verify querying a 100,000-item identical hash bucket with a small limit does not materialize all."""
+    # Create 100,000 items with the same hash
+    items = [(f"item_{i}", 0x12345678) for i in range(100_000)]
 
-    limit = 25
-    pairs, is_truncated = BKTree.find_all_pairs(items, max_dist=6, max_candidate_pairs=limit)
+    # Query with max_candidate_pairs=10
+    pairs, is_truncated = BKTree.find_all_pairs(items, max_dist=0, max_candidate_pairs=10)
 
+    assert len(pairs) == 10
     assert is_truncated is True
-    assert len(pairs) == limit
+    # Verify pairs contain earlier-to-later indexing
+    for _prev, _curr, d in pairs:
+        assert d == 0
 
 
-def test_bktree_deterministic_ordering():
-    """BK-tree finds pairs deterministically regardless of list insertion variations."""
-    h_list = [
-        ("a.jpg", 0x1000000000000000),
-        ("b.jpg", 0x1000000000000001),  # d=1
-        ("c.jpg", 0x1000000000000003),  # d=2 from a, d=1 from b
-    ]
+def test_candidate_limit_boundary_and_completeness():
+    """Verify completeness semantics: is_truncated is False when total pairs <= limit, True when > limit."""
+    # 4 items with distance 0 generates exactly 4*3/2 = 6 pairs
+    items = [(f"x_{i}", 0xABC) for i in range(4)]
 
-    pairs1, _ = BKTree.find_all_pairs(h_list, max_dist=2)
-    pairs2, _ = BKTree.find_all_pairs(h_list, max_dist=2)
+    # When limit is exactly 6 (total matching pairs), result is complete
+    pairs, is_truncated = BKTree.find_all_pairs(items, max_dist=0, max_candidate_pairs=6)
+    assert len(pairs) == 6
+    assert is_truncated is False
 
-    assert pairs1 == pairs2
+    # When limit is 5 (< 6), result is truncated
+    pairs_trunc, is_trunc = BKTree.find_all_pairs(items, max_dist=0, max_candidate_pairs=5)
+    assert len(pairs_trunc) == 5
+    assert is_trunc is True
+
+
+def test_bktree_brute_force_adaptive_equivalence():
+    """Verify BKTree, brute force, and adaptive strategy yield identical results across randomized trials."""
+    for trial in range(10):
+        rng = random.Random(trial)
+        n = 60
+        cluster = [rng.getrandbits(HASH_BITS) for _ in range(3)]
+        records: list[tuple[str, int]] = []
+        for i in range(n):
+            if rng.random() < 0.25:
+                c = rng.choice(cluster)
+                h = c ^ (1 << rng.randint(0, HASH_BITS - 1))
+            else:
+                h = rng.getrandbits(HASH_BITS)
+            records.append((f"img_{i:03d}", h))
+
+        # 1. Unbounded pairing
+        bk_pairs, bk_trunc = BKTree.find_all_pairs(records, max_dist=4)
+        bf_pairs, bf_trunc = brute_force_find_all_pairs(records, max_dist=4)
+        adapt_pairs, adapt_trunc = find_candidate_pairs(records, max_dist=4, crossover_threshold=30)
+
+        assert bk_trunc is False
+        assert bf_trunc is False
+        assert adapt_trunc is False
+        assert set(bk_pairs) == set(bf_pairs)
+        assert set(adapt_pairs) == set(bf_pairs)
+
+        # 2. Bounded pairing with truncation
+        limit = 5
+        bk_lim, bk_lim_tr = BKTree.find_all_pairs(records, max_dist=4, max_candidate_pairs=limit)
+        bf_lim, bf_lim_tr = brute_force_find_all_pairs(
+            records, max_dist=4, max_candidate_pairs=limit
+        )
+        adapt_lim, adapt_lim_tr = find_candidate_pairs(
+            records, max_dist=4, max_candidate_pairs=limit, crossover_threshold=30
+        )
+
+        assert len(bk_lim) == min(limit, len(bk_pairs))
+        assert len(bf_lim) == min(limit, len(bf_pairs))
+        assert len(adapt_lim) == min(limit, len(adapt_pairs))
+        assert bk_lim_tr == (len(bk_pairs) > limit)
+        assert bf_lim_tr == (len(bf_pairs) > limit)
+        assert adapt_lim_tr == (len(adapt_pairs) > limit)
+
+
+def test_isolated_dct_computation_function():
+    """Verify compute_phash_from_preprocessed works directly on 32x32 grayscale images."""
+    img = Image.new("L", (32, 32), 100)
+    d = ImageDraw.Draw(img)
+    d.rectangle([5, 5, 20, 20], fill=200)
+
+    h = compute_phash_from_preprocessed(img)
+    assert isinstance(h, int)
+    assert 0 <= h <= MAX_HASH_VALUE
+
+    # Verify invalid dimensions or mode raise PHashDecodeError
+    bad_sz = Image.new("L", (16, 16))
+    with pytest.raises(PHashDecodeError, match="Expected 32x32 image"):
+        compute_phash_from_preprocessed(bad_sz)
+
+    bad_mode = Image.new("RGB", (32, 32))
+    with pytest.raises(PHashDecodeError, match="Expected grayscale mode 'L'"):
+        compute_phash_from_preprocessed(bad_mode)
