@@ -30,6 +30,15 @@ policy:
   duplicate_policy: warn
   split_leakage_policy: fail
 
+  # Perceptual near-duplicate detection (pHash)
+  perceptual_hash:
+    enabled: false
+    max_hamming_distance: 6
+    duplicate_policy: warn
+    split_leakage_policy: warn
+    max_candidate_pairs: 10000
+    truncation_action: fail
+
   # Physical image integrity policies
   corrupted_image_policy: fail
   missing_image_policy: fail

@@ -22,9 +22,87 @@ console = Console()
 err_console = Console(stderr=True)
 
 
+PERCEPTUAL_RULE_IDS = {
+    "PERCEPTUAL_DUPLICATE",
+    "PERCEPTUAL_SPLIT_LEAKAGE",
+    "PERCEPTUAL_ANALYSIS_TRUNCATED",
+    "PERCEPTUAL_HASH_UNAVAILABLE",
+}
+
+
+def _get_phash_coverage(snapshot: AuditSnapshot) -> dict:
+    """Safely extract perceptual hash coverage metadata if present."""
+    if not isinstance(snapshot.metadata, dict):
+        return {}
+    cov = snapshot.metadata.get("analysis_coverage")
+    if isinstance(cov, dict):
+        p_cov = cov.get("perceptual_hash")
+        if isinstance(p_cov, dict):
+            return p_cov
+    return {}
+
+
 def compare_snapshots(baseline: AuditSnapshot, current: AuditSnapshot) -> ComparisonResult:
-    """Deterministically compare a baseline AuditSnapshot with a current AuditSnapshot."""
+    """Deterministically compare a baseline AuditSnapshot with a current AuditSnapshot.
+
+    Handles coverage differences gracefully:
+    - If baseline did not execute perceptual hashing, new perceptual findings are not
+      falsely classified as dataset regressions.
+    - If current audit did not execute perceptual hashing, baseline perceptual findings
+      are not falsely classified as resolved.
+    - If algorithm, threshold, or completeness differs, perceptual finding coverage is
+      marked as not directly comparable.
+    """
     is_identical = baseline.dataset_fingerprint == current.dataset_fingerprint
+
+    # Analysis coverage analysis
+    base_cov = _get_phash_coverage(baseline)
+    curr_cov = _get_phash_coverage(current)
+
+    base_phash_executed = bool(base_cov.get("enabled") and base_cov.get("executed"))
+    curr_phash_executed = bool(curr_cov.get("enabled") and curr_cov.get("executed"))
+
+    coverage_notes: list[str] = []
+    phash_directly_comparable = True
+
+    if base_phash_executed and curr_phash_executed:
+        base_algo = base_cov.get("algorithm")
+        curr_algo = curr_cov.get("algorithm")
+        base_dist = base_cov.get("max_hamming_distance")
+        curr_dist = curr_cov.get("max_hamming_distance")
+        base_complete = base_cov.get("complete", True)
+        curr_complete = curr_cov.get("complete", True)
+
+        if base_algo != curr_algo:
+            phash_directly_comparable = False
+            coverage_notes.append(
+                f"Perceptual algorithm differs (baseline: {base_algo}, current: {curr_algo}); "
+                "perceptual findings are not directly comparable."
+            )
+        elif base_dist != curr_dist:
+            phash_directly_comparable = False
+            coverage_notes.append(
+                f"Perceptual Hamming distance threshold differs (baseline: {base_dist}, current: {curr_dist}); "
+                "perceptual findings are not directly comparable."
+            )
+        elif not base_complete or not curr_complete:
+            phash_directly_comparable = False
+            coverage_notes.append(
+                "Perceptual duplicate analysis was truncated in baseline or current snapshot; "
+                "coverage is not directly comparable."
+            )
+    elif curr_phash_executed and not base_phash_executed:
+        phash_directly_comparable = False
+        coverage_notes.append(
+            "Perceptual duplicate detection was executed in current audit but was not present in baseline; "
+            "perceptual findings are excluded from regression tracking."
+        )
+    elif base_phash_executed and not curr_phash_executed:
+        phash_directly_comparable = False
+        coverage_notes.append(
+            "Perceptual duplicate detection was not executed in current audit; "
+            "baseline perceptual findings are not considered resolved."
+        )
 
     # Count diffs
     img_diff = current.statistics.total_images - baseline.statistics.total_images
@@ -56,13 +134,24 @@ def compare_snapshots(baseline: AuditSnapshot, current: AuditSnapshot) -> Compar
 
     for fp, f in base_findings_by_fp.items():
         if fp not in curr_findings_by_fp:
+            # If current audit did not run perceptual check, baseline perceptual findings are un-evaluated, not resolved
+            if f.rule_id in PERCEPTUAL_RULE_IDS and not curr_phash_executed:
+                continue
             resolved_findings.append(f)
 
     # Detect regressions
     regressions: list[str] = []
 
-    # 1. Newly introduced ERROR findings
-    new_errors = [f for f in new_findings if f.severity == Severity.ERROR]
+    # 1. Newly introduced ERROR findings (excluding non-comparable perceptual findings)
+    new_errors = [
+        f
+        for f in new_findings
+        if f.severity == Severity.ERROR
+        and not (
+            f.rule_id in PERCEPTUAL_RULE_IDS
+            and not (base_phash_executed and phash_directly_comparable)
+        )
+    ]
     if new_errors:
         err_by_rule: dict[str, int] = {}
         for e in new_errors:
@@ -70,7 +159,7 @@ def compare_snapshots(baseline: AuditSnapshot, current: AuditSnapshot) -> Compar
         summary_rules = ", ".join(f"{cnt}x {rule}" for rule, cnt in err_by_rule.items())
         regressions.append(f"Introduced {len(new_errors)} new error(s): {summary_rules}")
 
-    # 2. Split leakage increase
+    # 2. Split leakage increase (exact duplicates)
     curr_leaks = current.statistics.leakage_groups_count
     base_leaks = baseline.statistics.leakage_groups_count
     if curr_leaks > base_leaks:
@@ -81,7 +170,17 @@ def compare_snapshots(baseline: AuditSnapshot, current: AuditSnapshot) -> Compar
     # 3. Overall policy status regression
     status_changed = baseline.policy_result.passed != current.policy_result.passed
     if baseline.policy_result.passed and not current.policy_result.passed:
-        regressions.append("Policy status regressed: baseline PASSED, current FAILED")
+        # Check if the failure is solely due to non-comparable perceptual findings
+        failing_rules = {f.rule_id for f in current.findings if f.severity == Severity.ERROR}
+        solely_perceptual_new = not (
+            base_phash_executed and phash_directly_comparable
+        ) and failing_rules.issubset(PERCEPTUAL_RULE_IDS)
+        if solely_perceptual_new:
+            coverage_notes.append(
+                "Overall policy status changed from PASSED to FAILED due to newly enabled or non-comparable perceptual checks."
+            )
+        else:
+            regressions.append("Policy status regressed: baseline PASSED, current FAILED")
 
     # 4. Worsening class imbalance (if ratio increased significantly, e.g. > 50% increase)
     base_imb = baseline.statistics.class_imbalance_ratio
@@ -105,6 +204,8 @@ def compare_snapshots(baseline: AuditSnapshot, current: AuditSnapshot) -> Compar
         f"Compared to baseline: {img_diff:+d} images, {ann_diff:+d} annotations. "
         f"{len(new_findings)} new findings ({len(new_errors)} errors), {len(resolved_findings)} resolved findings."
     )
+    if coverage_notes:
+        summary += f" Coverage notes: {'; '.join(coverage_notes)}"
 
     return ComparisonResult(
         baseline_fingerprint=baseline.dataset_fingerprint,
@@ -121,6 +222,7 @@ def compare_snapshots(baseline: AuditSnapshot, current: AuditSnapshot) -> Compar
         regressions=regressions,
         has_regressions=has_regressions,
         policy_status_changed=status_changed,
+        coverage_notes=coverage_notes,
         summary=summary,
     )
 
@@ -186,6 +288,11 @@ def compare_reports_cli(baseline_path: Path, current_path: Path) -> int:
     )
 
     console.print(table)
+
+    if diff.coverage_notes:
+        console.print("\n[bold yellow]Coverage Notes:[/bold yellow]")
+        for note in diff.coverage_notes:
+            console.print(f"  [yellow]ℹ[/yellow] {note}")
 
     # Regressions or Pass Panel
     if diff.has_regressions:

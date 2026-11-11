@@ -169,7 +169,8 @@ def run_audit(
     findings: list[Finding] = list(manifest.discovery_warnings)
     findings.extend(ImageIntegrityValidator().validate(manifest, config))
     findings.extend(AnnotationValidator().validate(manifest, config))
-    findings.extend(DuplicateValidator().validate(manifest, config))
+    dup_validator = DuplicateValidator()
+    findings.extend(dup_validator.validate(manifest, config))
 
     # De-duplicate findings by fingerprint
     unique_findings: list[Finding] = []
@@ -191,6 +192,12 @@ def run_audit(
     fingerprint = calculate_dataset_fingerprint(manifest, stats)
     dataset_name = dataset_root.name
 
+    snapshot_metadata = {
+        "analysis_coverage": {
+            "perceptual_hash": dup_validator.perceptual_coverage,
+        }
+    }
+
     snapshot = AuditSnapshot(
         dataset_fingerprint=fingerprint,
         format=manifest.format,
@@ -198,6 +205,7 @@ def run_audit(
         statistics=stats,
         findings=final_findings,
         policy_result=policy_result,
+        metadata=snapshot_metadata,
     )
 
     # 6. Baseline comparison (if requested)
@@ -238,7 +246,8 @@ def run_snapshot(
     findings: list[Finding] = list(manifest.discovery_warnings)
     findings.extend(ImageIntegrityValidator().validate(manifest, config))
     findings.extend(AnnotationValidator().validate(manifest, config))
-    findings.extend(DuplicateValidator().validate(manifest, config))
+    dup_validator = DuplicateValidator()
+    findings.extend(dup_validator.validate(manifest, config))
 
     # De-duplicate findings
     unique_findings: list[Finding] = []
@@ -254,6 +263,12 @@ def run_snapshot(
     final_findings, policy_result = policy_engine.evaluate(manifest, stats, unique_findings, config)
     fingerprint = calculate_dataset_fingerprint(manifest, stats)
 
+    snapshot_metadata = {
+        "analysis_coverage": {
+            "perceptual_hash": dup_validator.perceptual_coverage,
+        }
+    }
+
     snapshot = AuditSnapshot(
         dataset_fingerprint=fingerprint,
         format=manifest.format,
@@ -261,6 +276,7 @@ def run_snapshot(
         statistics=stats,
         findings=final_findings,
         policy_result=policy_result,
+        metadata=snapshot_metadata,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -297,6 +313,18 @@ def _render_console_summary(
     table.add_row("Class Imbalance Ratio", f"{stats.class_imbalance_ratio:.1f}:1")
     table.add_row("Duplicate Image Groups", str(stats.duplicate_groups_count))
     table.add_row("Cross-Split Leakages", str(stats.leakage_groups_count))
+    if (
+        "analysis_coverage" in snapshot.metadata
+        and "perceptual_hash" in snapshot.metadata["analysis_coverage"]
+    ):
+        p_cov = snapshot.metadata["analysis_coverage"]["perceptual_hash"]
+        if p_cov.get("enabled"):
+            table.add_row("Perceptual Duplicates", str(p_cov.get("perceptual_duplicate_pairs", 0)))
+            table.add_row("Perceptual Leakages", str(p_cov.get("perceptual_leakage_pairs", 0)))
+            if p_cov.get("is_truncated"):
+                table.add_row(
+                    "Perceptual Analysis", "[bold yellow]Truncated (limit reached)[/bold yellow]"
+                )
     table.add_row("Fingerprint", snapshot.dataset_fingerprint)
 
     console.print(table)

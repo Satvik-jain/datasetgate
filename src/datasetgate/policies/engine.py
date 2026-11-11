@@ -40,6 +40,9 @@ class PolicyEngine:
             "BBOX_OUT_OF_BOUNDS": policy.out_of_bounds_policy,
             "EXACT_DUPLICATE_IMAGE": policy.duplicate_policy,
             "SPLIT_LEAKAGE": policy.split_leakage_policy,
+            "PERCEPTUAL_DUPLICATE": policy.perceptual_hash.duplicate_policy,
+            "PERCEPTUAL_SPLIT_LEAKAGE": policy.perceptual_hash.split_leakage_policy,
+            "PERCEPTUAL_ANALYSIS_TRUNCATED": policy.perceptual_hash.truncation_action,
         }
 
         adjusted_findings: list[Finding] = []
@@ -232,6 +235,31 @@ class PolicyEngine:
                     message="No cross-split image leakage detected.",
                 )
             )
+
+        if policy.perceptual_hash.enabled:
+            has_perceptual_leak = any(f.rule_id == "PERCEPTUAL_SPLIT_LEAKAGE" for f in all_findings)
+            if not has_perceptual_leak and len(manifest.splits) > 1:
+                passed_checks.append("perceptual_split_leakage_free")
+                check_results.append(
+                    PolicyCheckResult(
+                        name="perceptual_split_leakage_free",
+                        passed=True,
+                        status="PASSED",
+                        message="No cross-split perceptual duplicate leakage detected.",
+                    )
+                )
+
+            has_perceptual_dup = any(f.rule_id == "PERCEPTUAL_DUPLICATE" for f in all_findings)
+            if not has_perceptual_dup and len(manifest.images) > 0:
+                passed_checks.append("perceptual_duplicate_free")
+                check_results.append(
+                    PolicyCheckResult(
+                        name="perceptual_duplicate_free",
+                        passed=True,
+                        status="PASSED",
+                        message="No intra-split perceptual near-duplicates detected.",
+                    )
+                )
 
         has_corrupt = any(
             f.rule_id == "CORRUPTED_IMAGE" and f.severity == Severity.ERROR for f in all_findings

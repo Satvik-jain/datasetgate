@@ -179,4 +179,5 @@ class ComparisonResult(BaseModel):
     regressions: list[str] = Field(default_factory=list)
     has_regressions: bool = False
     policy_status_changed: bool = False
+    coverage_notes: list[str] = Field(default_factory=list)
     summary: str = ""

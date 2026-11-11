@@ -48,6 +48,47 @@ class DatasetConfig(BaseModel):
     )
 
 
+class PerceptualHashConfig(BaseModel):
+    """Perceptual near-duplicate and cross-split leakage detection settings."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable perceptual near-duplicate and leakage detection (pHash)",
+    )
+    max_hamming_distance: int = Field(
+        default=6,
+        ge=0,
+        le=63,
+        description="Maximum Hamming distance threshold for candidate near-duplicates (0 to 63)",
+    )
+    duplicate_policy: PolicyAction = Field(
+        default=PolicyAction.WARN,
+        description="Action on approximate duplicate images within a split ('ignore', 'warn', 'fail')",
+    )
+    split_leakage_policy: PolicyAction = Field(
+        default=PolicyAction.WARN,
+        description="Action on approximate duplicate images leaked across splits ('ignore', 'warn', 'fail')",
+    )
+    max_candidate_pairs: int = Field(
+        default=10000,
+        gt=0,
+        description="Maximum candidate pairs to evaluate before truncating analysis (must be positive)",
+    )
+    truncation_action: PolicyAction = Field(
+        default=PolicyAction.FAIL,
+        description="Action when candidate pair limit is exceeded ('warn', 'fail')",
+    )
+
+    @field_validator("truncation_action")
+    @classmethod
+    def validate_truncation_action(cls, v: PolicyAction) -> PolicyAction:
+        if v == PolicyAction.IGNORE:
+            raise ValueError(
+                "truncation_action cannot be 'ignore'; truncated analysis must be flagged as 'warn' or 'fail'"
+            )
+        return v
+
+
 class PolicyConfig(BaseModel):
     """Configurable quality policy rules and thresholds."""
 
@@ -93,6 +134,10 @@ class PolicyConfig(BaseModel):
     out_of_bounds_policy: PolicyAction = Field(
         default=PolicyAction.FAIL,
         description="Action on bounding boxes that extend outside image bounds ('ignore', 'warn', 'fail')",
+    )
+    perceptual_hash: PerceptualHashConfig = Field(
+        default_factory=PerceptualHashConfig,
+        description="Perceptual near-duplicate and leakage detection settings",
     )
     rule_severities: dict[str, Severity] = Field(
         default_factory=dict,
@@ -205,6 +250,15 @@ policy:
   # Leakage and duplicates: 'ignore', 'warn', 'fail'
   duplicate_policy: warn
   split_leakage_policy: fail
+
+  # Perceptual near-duplicate detection (pHash)
+  perceptual_hash:
+    enabled: false
+    max_hamming_distance: 6
+    duplicate_policy: warn
+    split_leakage_policy: warn
+    max_candidate_pairs: 10000
+    truncation_action: fail
 
   # Integrity policies: 'ignore', 'warn', 'fail'
   corrupted_image_policy: fail
